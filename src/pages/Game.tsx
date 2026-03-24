@@ -45,7 +45,7 @@ import { GameCardComponent } from '@/components/game/cards/GameCardComponent';
 import { CardBack } from '@/components/game/cards/CardBack';
 import { ActionResponsePanel } from '@/components/game/ActionResponsePanel';
 import { TargetSelector } from '@/components/game/TargetSelector';
-import { DollarSign, Trophy, ChevronRight, Layers, Hand, Sparkles, RefreshCw } from 'lucide-react';
+import { DollarSign, Trophy, ChevronRight, ChevronDown, Layers, Hand, Sparkles, RefreshCw } from 'lucide-react';
 
 interface Player {
   user_id: string;
