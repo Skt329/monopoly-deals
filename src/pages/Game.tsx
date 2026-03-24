@@ -658,21 +658,24 @@ export default function Game() {
       )}
 
       {/* ═══ Flying Cards Animation ═══ */}
-      {flyingCards.map(fc => (
-        <div
-          key={fc.id}
-          className="fixed z-50 pointer-events-none animate-fly-to-hand"
-          style={{
-            top: deckRef.current?.getBoundingClientRect().top || '40%',
-            left: deckRef.current?.getBoundingClientRect().left || '50%',
-            animationDelay: `${fc.delay}ms`,
-            '--fly-x': '0px',
-            '--fly-y': '200px',
-          } as React.CSSProperties}
-        >
-          <CardBack />
-        </div>
-      ))}
+      {flyingCards.map(fc => {
+        const deckRect = deckRef.current?.getBoundingClientRect();
+        return (
+          <div
+            key={fc.id}
+            className="fixed z-50 pointer-events-none animate-fly-to-hand"
+            style={{
+              top: deckRect?.top ?? '40%',
+              left: deckRect?.left ?? '10%',
+              animationDelay: `${fc.delay}ms`,
+              '--fly-x': `${fc.flyX}px`,
+              '--fly-y': `${fc.flyY}px`,
+            } as React.CSSProperties}
+          >
+            <CardBack small />
+          </div>
+        );
+      })}
 
       {/* ═══ Action Response Panel ═══ */}
       {gameState.phase === 'responding' && gameState.pendingAction && (
