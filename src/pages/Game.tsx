@@ -258,7 +258,7 @@ export default function Game() {
                 <span className="font-semibold text-sm text-foreground">{player.display_name}</span>
                 <div className="flex items-center gap-2">
                   <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
-                    <HandFan className="w-3 h-3" /> {handCount}
+                    <Hand className="w-3 h-3" /> {handCount}
                   </span>
                   <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
                     <DollarSign className="w-3 h-3" /> {board ? getBankTotal(board) : 0}M
@@ -416,7 +416,7 @@ export default function Game() {
       {/* My hand */}
       <div className="flex-none border-t bg-card/80 backdrop-blur-sm px-4 py-3">
         <div className="flex items-center gap-2 mb-2">
-          <HandFan className="w-4 h-4 text-muted-foreground" />
+          <Hand className="w-4 h-4 text-muted-foreground" />
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             Your Hand ({myHand.length})
           </span>
