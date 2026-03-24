@@ -795,11 +795,48 @@ export default function Game() {
         />
       )}
 
+      {/* Flying cards animation */}
+      {flyingCards.length > 0 && flyingCards.map(fc => (
+        <div
+          key={fc.id}
+          className="fixed z-[70] pointer-events-none"
+          style={{
+            left: fc.started ? fc.endX - 32 : fc.startX - 32,
+            top: fc.started ? fc.endY - 48 : fc.startY - 48,
+            transition: 'all 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+            opacity: fc.started ? 0.3 : 1,
+          }}
+        >
+          <CardBack />
+        </div>
+      ))}
+
       {/* Top bar */}
       <div className="flex items-center justify-between px-3 py-1.5 border-b bg-card shadow-sm">
         <div className="flex items-center gap-2">
           <h2 className="font-bold text-sm text-foreground tracking-tight">MONOPOLY DEAL</h2>
           <Badge variant="secondary" className="font-mono text-[10px]">{roomCode}</Badge>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] text-destructive hover:text-destructive">
+                <LogOut className="w-3 h-3 mr-1" /> Exit
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Exit Game?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Your cards will be returned to the deck. If you're the last player, the game ends. This cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleExitGame} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  Leave Game
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
         <div className="flex items-center gap-2 text-sm">
           <Badge variant={isMyTurn ? 'default' : 'secondary'} className={`text-xs ${isMyTurn ? 'animate-pulse' : ''}`}>
