@@ -38,6 +38,8 @@ import {
   anyOpponentHasStealable,
   getStealableProperties,
   getCompleteSetColors,
+  isSetComplete,
+  calculateRent,
 } from '@/lib/gameEngine';
 import { GameCardComponent } from '@/components/game/cards/GameCardComponent';
 import { CardBack } from '@/components/game/cards/CardBack';
