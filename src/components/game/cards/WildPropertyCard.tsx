@@ -1,17 +1,11 @@
 import { cn } from '@/lib/utils';
-import { type GameCard, COLOR_CONFIG, type PropertyColor, PROPERTY_SETS } from '@/data/cards';
+import { type GameCard, COLOR_CONFIG, PROPERTY_SETS } from '@/data/cards';
 
 interface WildPropertyCardProps {
   card: GameCard;
   onClick?: () => void;
   selected?: boolean;
 }
-
-const COLOR_HEX: Record<PropertyColor, string> = {
-  'brown': '#8B4513', 'light-blue': '#87CEEB', 'magenta': '#C71585',
-  'orange': '#FF8C00', 'red': '#DC143C', 'yellow': '#FFD700',
-  'green': '#228B22', 'dark-blue': '#4169E1', 'railroad': '#2F2F2F', 'utility': '#32CD32',
-};
 
 export function WildPropertyCard({ card, onClick, selected }: WildPropertyCardProps) {
   const colors = card.colors || [];
@@ -22,107 +16,153 @@ export function WildPropertyCard({ card, onClick, selected }: WildPropertyCardPr
       <div
         onClick={onClick}
         className={cn(
-          'relative rounded-xl shadow-lg cursor-pointer transition-all duration-200 select-none overflow-hidden flex flex-col w-36 h-52',
+          'relative rounded-xl shadow-[0_4px_10px_rgba(0,0,0,0.15)] cursor-pointer transition-all duration-200 select-none overflow-hidden flex flex-col w-36 h-52 bg-white p-[3px]',
           selected && 'ring-2 ring-primary scale-105 -translate-y-2',
           onClick && 'hover:scale-105 hover:-translate-y-1'
         )}
-        style={{ border: '2px solid #333' }}
       >
-        {/* Rainbow top half */}
-        <div className="flex flex-col items-center justify-center text-center py-3 px-2"
-          style={{ backgroundColor: '#1a1a2e', flex: '0 0 55%' }}>
-          <span className="font-black uppercase text-lg"
-            style={{ background: 'linear-gradient(90deg, #DC143C, #FF8C00, #FFD700, #228B22, #4169E1, #C71585)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            WILD
-          </span>
-          <span className="font-black uppercase text-sm"
-            style={{ background: 'linear-gradient(90deg, #228B22, #4169E1, #C71585, #DC143C)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            PROPERTY
-          </span>
-          <p className="text-white font-bold text-[8px] mt-1 uppercase">
-            USE THIS CARD AS<br/>PART OF ANY SET
-          </p>
-        </div>
+        <div 
+          className="relative flex-1 rounded-[8px] flex flex-col bg-white overflow-hidden pointer-events-none"
+          style={{ border: '1.5px solid #1a1a1a' }}
+        >
+          {/* Top-left value circle - overlapping everything */}
+          <div className="absolute z-20 top-1.5 left-1.5 w-[28px] h-[28px] rounded-[50%] flex items-center justify-center bg-[#FEFEFE] shadow-sm"
+            style={{ border: '2px solid #1a1a1a', color: '#1a1a1a' }}>
+            <span className="font-display font-black text-sm leading-none flex items-start -ml-0.5">
+              <span className="text-[7px] mt-[1px]">M</span>
+              <span className="tracking-tighter">{card.value}</span>
+            </span>
+          </div>
 
-        {/* Bottom half with color dots */}
-        <div className="flex-1 bg-[#F5F0E8] flex flex-col items-center justify-center px-2">
-          <div className="flex flex-wrap gap-1 justify-center">
-            {colors.map(c => (
-              <span key={c} className="w-3 h-3 rounded-full border border-white shadow-sm"
-                style={{ backgroundColor: COLOR_HEX[c] }} />
-            ))}
+          <div className="flex-1 flex flex-col p-[4px] bg-white">
+            <div className="flex-1 flex flex-col rounded-[2px]" style={{
+              background: 'linear-gradient(90deg, #DF3341 0%, #F68B29 20%, #FFDF00 40%, #28A745 60%, #1C52A3 80%, #C95FA8 100%)'
+            }}>
+              
+              {/* Header Area filled with gradient */}
+              <div className="flex flex-col items-center justify-center pt-2 pb-2 px-1 text-center min-h-[50px] border-b-2 border-[#1a1a1a]">
+                <span className="text-[12px] font-display font-black uppercase text-white leading-tight" style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}>
+                  PROPERTY<br/>WILD CARD
+                </span>
+              </div>
+
+              {/* Content Area - White */}
+              <div className="flex-1 bg-[#FEFEFE] flex flex-col items-center justify-center px-2 py-2 text-center">
+                <p className="font-display font-black uppercase text-[10px] text-[#1a1a1a] leading-tight mb-2">
+                  This card can be used as part of any property set.
+                </p>
+                
+                {/* Rainbow dots */}
+                <div className="flex flex-wrap gap-1 justify-center max-w-[80%]">
+                  {colors.map(c => (
+                    <span key={c} className="w-[10px] h-[10px] rounded-full shadow-sm"
+                      style={{ backgroundColor: COLOR_CONFIG[c].bg, border: '1px solid #1a1a1a' }} />
+                  ))}
+                </div>
+                
+                {card.chosenColor && (
+                  <div className="mt-3 text-center font-display font-black text-white text-[8px] py-1 px-2 rounded-full shadow-sm" style={{ backgroundColor: COLOR_CONFIG[card.chosenColor].bg, border: '1px solid #1a1a1a' }}>
+                    PLAYED AS: {COLOR_CONFIG[card.chosenColor].label}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
-
-        {card.chosenColor && (
-          <div className="text-center font-bold text-white text-[7px] py-0.5" style={{ backgroundColor: COLOR_HEX[card.chosenColor] }}>
-            → {COLOR_CONFIG[card.chosenColor].label}
-          </div>
-        )}
       </div>
     );
   }
 
   // Two-color wild
+  const c1 = COLOR_CONFIG[colors[0]];
+  const c2 = COLOR_CONFIG[colors[1]];
+
   return (
     <div
       onClick={onClick}
       className={cn(
-        'relative rounded-xl shadow-lg cursor-pointer transition-all duration-200 select-none overflow-hidden flex flex-col bg-[#F5F0E8] w-36 h-52',
+        'relative rounded-xl shadow-[0_4px_10px_rgba(0,0,0,0.15)] cursor-pointer transition-all duration-200 select-none overflow-hidden flex flex-col w-36 h-52 bg-white p-[3px]',
         selected && 'ring-2 ring-primary scale-105 -translate-y-2',
         onClick && 'hover:scale-105 hover:-translate-y-1'
       )}
-      style={{ border: `2px solid ${COLOR_HEX[colors[0]]}` }}
     >
-      {/* Header */}
-      <div className="text-center text-white font-black uppercase py-1.5 text-[9px]"
-        style={{ background: `linear-gradient(90deg, ${COLOR_HEX[colors[0]]}, ${COLOR_HEX[colors[1]]})` }}>
-        WILD PROPERTY
-        <p className="text-[7px] font-bold opacity-90">CHOOSE ONE COLOR</p>
-      </div>
-
-      {/* Value circle */}
-      <div className="absolute z-10 top-1 left-1 w-7 h-7 text-[9px] rounded-full font-black flex items-center justify-center bg-white"
-        style={{ border: '2px solid #333', color: '#333' }}>
-        M{card.value}
-      </div>
-
-      {/* Two rent tables side by side */}
-      <div className="flex-1 flex p-1">
-        {colors.map(color => {
-          const rentTable = PROPERTY_SETS[color].rent;
-          const setSize = PROPERTY_SETS[color].size;
-          return (
-            <div key={color} className="flex-1 px-1 flex flex-col">
-              <div className="text-[6px] font-black text-center mb-0.5 uppercase tracking-wider"
-                style={{ color: COLOR_HEX[color] }}>
-                {COLOR_CONFIG[color].label}
-              </div>
-              <div className="flex-1">
-                {Object.entries(rentTable).map(([count, rent]) => (
-                  <div key={count} className="flex justify-between text-[7px] py-0.5">
-                    <div className="flex items-center gap-0.5">
-                      {Array.from({ length: Number(count) }).map((_, i) => (
-                        <div key={i} className="w-2 h-2.5 rounded-[1px]" style={{ backgroundColor: COLOR_HEX[color] }} />
-                      ))}
-                    </div>
-                    <span className="font-black">M{rent}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="text-[5px] text-center font-bold uppercase" style={{ color: '#888' }}>
-                Set: {setSize}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {card.chosenColor && (
-        <div className="text-center font-bold text-white text-[7px] py-0.5" style={{ backgroundColor: COLOR_HEX[card.chosenColor] }}>
-          → {COLOR_CONFIG[card.chosenColor].label}
+      <div 
+        className="relative flex-1 rounded-[8px] flex flex-col bg-white overflow-hidden pointer-events-none"
+        style={{ border: '1.5px solid #1a1a1a' }}
+      >
+        <div className="absolute z-20 top-1.5 left-1.5 w-[28px] h-[28px] rounded-[50%] flex items-center justify-center bg-[#FEFEFE] shadow-sm"
+          style={{ border: '2px solid #1a1a1a', color: '#1a1a1a' }}>
+          <span className="font-display font-black text-sm leading-none flex items-start -ml-0.5">
+            <span className="text-[7px] mt-[1px]">M</span>
+            <span className="tracking-tighter">{card.value}</span>
+          </span>
         </div>
-      )}
+
+        <div className="flex-1 flex flex-col p-[4px] bg-white">
+          <div className="flex-1 flex flex-col rounded-[2px]" style={{ background: `linear-gradient(90deg, ${c1.bg} 50%, ${c2.bg} 50%)` }}>
+            
+            <div className="flex flex-col items-center justify-center pt-2 pb-2 px-1 text-center min-h-[42px] border-b-2 border-[#1a1a1a]">
+              <span className="text-[5px] font-sans font-bold uppercase tracking-[0.15em] mb-0.5 text-white" style={{ textShadow: '0px 1px 1px rgba(0,0,0,0.5)' }}>
+                Property Wild Card
+              </span>
+              <span className="text-[7.5px] font-display font-black text-white uppercase leading-[1.1]" style={{ textShadow: '0px 1px 1px rgba(0,0,0,0.5)' }}>
+                {c1.label} / {c2.label}
+              </span>
+            </div>
+
+            <div className="flex-1 bg-white flex relative">
+              {/* Divider vertical line inside white area */}
+              <div className="absolute left-[50%] top-0 bottom-0 w-[1px] bg-[#1a1a1a] z-0" />
+              
+              {colors.map((color, colIndex) => {
+                const config = COLOR_CONFIG[color];
+                const rentTable = PROPERTY_SETS[color].rent;
+                const setSize = PROPERTY_SETS[color].size;
+                return (
+                  <div key={color} className="flex-1 px-1 pt-1 pb-1 flex flex-col relative z-10">
+                    <div className="flex justify-between items-end border-b-[1px] border-[#1a1a1a] pb-[1px] mb-1">
+                      <span className="text-[5px] font-display font-black text-center uppercase leading-tight text-[#1a1a1a]">
+                        Rent
+                      </span>
+                    </div>
+                    <div className="flex-1 flex flex-col justify-start gap-0.5">
+                      {Object.entries(rentTable).map(([count, rent]) => {
+                        const isComplete = Number(count) === setSize;
+                        return (
+                          <div key={count} className="flex items-center justify-between">
+                            <div className="flex items-center gap-[1px]">
+                              {isComplete && <span className="text-[5px] text-amber-500 -ml-[3px]">★</span>}
+                              <span className="text-[5.5px] font-sans font-bold text-[#1a1a1a]">
+                                {count} {Number(count) > 1 ? 'Cards' : 'Card'}
+                              </span>
+                            </div>
+                            <span className="font-display font-black text-[8px] text-[#1a1a1a]">
+                              <span className="text-[6px] align-top tracking-tighter mr-[1px]">M</span>{rent}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="text-center mt-auto border-t-[1px] border-[#1a1a1a] pt-[1px]">
+                      <span className="text-[5px] font-display font-black uppercase text-[#1a1a1a]">
+                        Set: {setSize}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            
+            {card.chosenColor && (
+              <div className="absolute bottom-1.5 left-0 right-0 flex justify-center z-30">
+                <div className="text-center font-display font-black text-white text-[7px] py-0.5 px-2 rounded-full shadow-sm" style={{ backgroundColor: COLOR_CONFIG[card.chosenColor].bg, border: '1px solid #1a1a1a' }}>
+                  PLAYED AS: {COLOR_CONFIG[card.chosenColor].label}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

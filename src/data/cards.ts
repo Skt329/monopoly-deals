@@ -40,16 +40,16 @@ export const PROPERTY_SETS: Record<PropertyColor, { size: number; rent: RentTabl
 
 // Color display config
 export const COLOR_CONFIG: Record<PropertyColor, { bg: string; text: string; label: string }> = {
-  'brown':      { bg: 'bg-amber-800', text: 'text-white', label: 'Brown' },
-  'light-blue': { bg: 'bg-sky-300', text: 'text-sky-900', label: 'Light Blue' },
-  'magenta':    { bg: 'bg-fuchsia-600', text: 'text-white', label: 'Pink' },
-  'orange':     { bg: 'bg-orange-500', text: 'text-white', label: 'Orange' },
-  'red':        { bg: 'bg-red-600', text: 'text-white', label: 'Red' },
-  'yellow':     { bg: 'bg-yellow-400', text: 'text-yellow-900', label: 'Yellow' },
-  'green':      { bg: 'bg-green-600', text: 'text-white', label: 'Green' },
-  'dark-blue':  { bg: 'bg-blue-800', text: 'text-white', label: 'Dark Blue' },
-  'railroad':   { bg: 'bg-zinc-800', text: 'text-white', label: 'Railroad' },
-  'utility':    { bg: 'bg-emerald-500', text: 'text-white', label: 'Utility' },
+  'brown':      { bg: '#6A381F', text: '#FFFFFF', label: 'Brown' },
+  'light-blue': { bg: '#AADEF1', text: '#1A1A1A', label: 'Light Blue' },
+  'magenta':    { bg: '#D13E8F', text: '#FFFFFF', label: 'Pink' },
+  'orange':     { bg: '#F68B29', text: '#1A1A1A', label: 'Orange' },
+  'red':        { bg: '#ED1B24', text: '#FFFFFF', label: 'Red' },
+  'yellow':     { bg: '#FFDE00', text: '#1A1A1A', label: 'Yellow' },
+  'green':      { bg: '#1FB25A', text: '#FFFFFF', label: 'Green' },
+  'dark-blue':  { bg: '#0066A4', text: '#FFFFFF', label: 'Dark Blue' },
+  'railroad':   { bg: '#1A1A1A', text: '#FFFFFF', label: 'Railroad' },
+  'utility':    { bg: '#BED79D', text: '#1A1A1A', label: 'Utility' },
 };
 
 // ═══════════════════════════════════════════

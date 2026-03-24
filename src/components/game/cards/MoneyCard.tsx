@@ -7,61 +7,99 @@ interface MoneyCardProps {
   selected?: boolean;
 }
 
-const MONEY_STYLES: Record<number, { bg: string; border: string; circle: string }> = {
-  1:  { bg: '#E8E6D8', border: '#999', circle: '#555' },
-  2:  { bg: '#F8C8D4', border: '#D4708A', circle: '#C0607A' },
-  3:  { bg: '#B8D8E8', border: '#6A9AB8', circle: '#5088A8' },
-  4:  { bg: '#C8E8C0', border: '#6AAF60', circle: '#509F48' },
-  5:  { bg: '#C8B8E0', border: '#8A70B0', circle: '#7A60A0' },
-  10: { bg: '#F8D8A0', border: '#D4A040', circle: '#C49030' },
+const MONEY_COLORS: Record<number, string> = {
+  1: '#E4DEC5', // Tan
+  2: '#F5C5C9', // Pink
+  3: '#BDDCED', // Light Blue
+  4: '#91C8D4', // Teal/Cyan
+  5: '#BFA7D4', // Purple
+  10: '#F1D28C',// Gold/Orange
+};
+
+// Corner text colors for faded effect
+const CORNER_COLORS: Record<number, string> = {
+  1: '#C8C2A8',
+  2: '#DF9FA5',
+  3: '#A3ADC0',
+  4: '#71AABA',
+  5: '#A38CB9',
+  10: '#D5A866',
 };
 
 export function MoneyCard({ card, onClick, selected }: MoneyCardProps) {
-  const style = MONEY_STYLES[card.value] || MONEY_STYLES[1];
+  const bg = MONEY_COLORS[card.value] || MONEY_COLORS[1];
+  const cornerColor = CORNER_COLORS[card.value] || CORNER_COLORS[1];
 
   return (
     <div
       onClick={onClick}
       className={cn(
-        'relative rounded-xl shadow-lg cursor-pointer transition-all duration-200 select-none overflow-hidden flex flex-col w-36 h-52',
+        'relative rounded-xl shadow-[0_4px_10px_rgba(0,0,0,0.15)] cursor-pointer transition-all duration-200 select-none flex flex-col w-36 h-52 bg-white p-[3px]',
         selected && 'ring-2 ring-primary scale-105 -translate-y-2',
         onClick && 'hover:scale-105 hover:-translate-y-1'
       )}
-      style={{ backgroundColor: style.bg, border: `2px solid ${style.border}` }}
     >
-      {/* Top-left value circle */}
-      <div className="absolute z-10 top-2 left-2 w-8 h-8 text-xs rounded-full font-black flex items-center justify-center bg-white"
-        style={{ border: `2px solid ${style.circle}`, color: '#333' }}>
-        <span className="text-[6px] align-top">M</span>{card.value}
-      </div>
+      <div 
+        className="relative flex-1 rounded-[8px] flex flex-col font-sans overflow-hidden"
+        style={{ backgroundColor: bg, border: '1.5px solid #1a1a1a' }}
+      >
+        {/* Chevron pattern overlay */}
+        <div className="absolute inset-0 bg-monopoly-pattern opacity-[0.85] mix-blend-overlay pointer-events-none rounded-[8px]" />
 
-      {/* Inner bordered area */}
-      <div className="flex-1 flex flex-col items-center justify-center mx-2.5 my-8"
-        style={{ border: `2px solid ${style.circle}` }}>
-        
-        {/* Large center circle with denomination */}
-        <div className="rounded-full flex items-center justify-center w-20 h-20"
-          style={{ border: `3px solid ${style.circle}` }}>
-          <div className="text-center">
-            <span className="font-black text-3xl" style={{ color: '#333' }}>
-              <span className="text-xs align-top">M</span>
-              {card.value}
-            </span>
+        {/* Top-left value circle */}
+        <div className="absolute z-10 top-1.5 left-1.5 w-[34px] h-[34px] rounded-[50%] flex items-center justify-center bg-[#FEFEFE] shadow-sm"
+          style={{ border: '2.5px solid #1a1a1a', color: '#1a1a1a' }}>
+          <span className="font-display font-black text-xl leading-none flex items-start -ml-0.5 pointer-events-none">
+            <span className="text-[9px] mt-[2px] tracking-tighter">M</span>
+            <span className="tracking-tighter">{card.value}</span>
+          </span>
+        </div>
+
+        {/* Inner bordered area */}
+        <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-2 mt-4">
+          
+          {/* Large center graphic */}
+          <div className="relative flex flex-col items-center justify-center mt-2 pointer-events-none">
+            {/* The giant white circle */}
+            <div className="rounded-[50%] flex items-center justify-center w-[90px] h-[90px] bg-white shadow-sm"
+              style={{ border: '3px solid #1a1a1a' }}>
+              
+              <div className="text-center transform -translate-y-1">
+                <span className="font-display font-black text-5xl tracking-tighter"
+                  style={{ 
+                    color: '#1a1a1a',
+                    textShadow: '-1.5px -1.5px 0 #fff, 1.5px -1.5px 0 #fff, -1.5px 1.5px 0 #fff, 1.5px 1.5px 0 #fff, 0px 3px 0px rgba(0,0,0,0.2)' 
+                  }}>
+                  <span className="text-2xl align-top mr-0.5 tracking-tighter font-extrabold">M</span>
+                  {card.value}
+                </span>
+              </div>
+            </div>
+
+            {/* MONOPOLY banner crossing the bottom of the circle */}
+            <div className="absolute -bottom-3 px-3 py-1 font-display font-black tracking-widest text-[#FEFEFE] uppercase text-[10px] transform skew-x-[-10deg]"
+              style={{ 
+                backgroundColor: '#1a1a1a', 
+                border: '1px solid #FEFEFE',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+              }}>
+              <div className="transform skew-x-[10deg]">Monopoly</div>
+            </div>
           </div>
         </div>
 
-        {/* MONOPOLY text */}
-        <div className="mt-1 text-center">
-          <span className="font-black text-[10px] tracking-wider" style={{ color: '#333' }}>
-            MONOPOLY
-          </span>
+        {/* Bottom-right large faded denomination */}
+        <div className="absolute bottom-0 right-0 overflow-hidden w-full h-[60px] pointer-events-none">
+          <div className="absolute -bottom-4 -right-1 flex items-baseline filter drop-shadow-sm opacity-60">
+            <span className="font-display font-black text-[65px] leading-none" style={{ color: cornerColor }}>{card.value}</span>
+            <span className="font-display font-black text-[28px] leading-none ml-0.5" style={{ color: cornerColor }}>M</span>
+          </div>
         </div>
-      </div>
-
-      {/* Bottom-right large faded denomination */}
-      <div className="absolute bottom-1 right-2 flex items-baseline opacity-30">
-        <span className="font-black text-4xl" style={{ color: style.circle }}>{card.value}</span>
-        <span className="font-black text-lg" style={{ color: style.circle }}>M</span>
+        
+        {/* Faint logo/symbol lower-left */}
+        <div className="absolute bottom-1 left-2 pointer-events-none">
+          <span className="text-xl" style={{ color: cornerColor, opacity: 0.5 }}>💰</span>
+        </div>
       </div>
     </div>
   );

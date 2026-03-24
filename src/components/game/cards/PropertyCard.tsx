@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { type GameCard, type PropertyColor, PROPERTY_SETS } from '@/data/cards';
+import { type GameCard, COLOR_CONFIG, PROPERTY_SETS } from '@/data/cards';
 
 interface PropertyCardProps {
   card: GameCard;
@@ -7,15 +7,9 @@ interface PropertyCardProps {
   selected?: boolean;
 }
 
-const COLOR_HEX: Record<PropertyColor, string> = {
-  'brown': '#8B4513', 'light-blue': '#87CEEB', 'magenta': '#C71585',
-  'orange': '#FF8C00', 'red': '#DC143C', 'yellow': '#FFD700',
-  'green': '#228B22', 'dark-blue': '#4169E1', 'railroad': '#2F2F2F', 'utility': '#32CD32',
-};
-
 export function PropertyCard({ card, onClick, selected }: PropertyCardProps) {
   const color = card.chosenColor || card.color!;
-  const hex = COLOR_HEX[color];
+  const config = COLOR_CONFIG[color];
   const rentTable = PROPERTY_SETS[color].rent;
   const setSize = PROPERTY_SETS[color].size;
 
@@ -23,82 +17,78 @@ export function PropertyCard({ card, onClick, selected }: PropertyCardProps) {
     <div
       onClick={onClick}
       className={cn(
-        'relative rounded-xl shadow-lg cursor-pointer transition-all duration-200 select-none overflow-hidden flex flex-col bg-[#F5F0E8] w-36 h-52',
+        'relative rounded-xl shadow-[0_4px_10px_rgba(0,0,0,0.15)] cursor-pointer transition-all duration-200 select-none overflow-hidden flex flex-col w-36 h-52 bg-white p-[3px]',
         selected && 'ring-2 ring-primary scale-105 -translate-y-2',
         onClick && 'hover:scale-105 hover:-translate-y-1'
       )}
-      style={{ border: `2px solid ${hex}` }}
     >
-      {/* Color header with property name */}
-      <div
-        className="text-center text-white font-black uppercase leading-tight px-2 py-2.5 text-[11px]"
-        style={{ backgroundColor: hex }}
+      {/* Black thin border container */}
+      <div 
+        className="relative flex-1 rounded-[8px] flex flex-col bg-white overflow-hidden pointer-events-none"
+        style={{ border: '1.5px solid #1a1a1a' }}
       >
-        {card.name}
-      </div>
+        {/* Top-left value circle - overlapping everything */}
+        <div className="absolute z-20 top-1.5 left-1.5 w-[28px] h-[28px] rounded-[50%] flex items-center justify-center bg-[#FEFEFE] shadow-sm"
+          style={{ border: '2px solid #1a1a1a', color: '#1a1a1a' }}>
+          <span className="font-display font-black text-sm leading-none flex items-start -ml-0.5">
+            <span className="text-[7px] mt-[1px]">M</span>
+            <span className="tracking-tighter">{card.value}</span>
+          </span>
+        </div>
 
-      {/* Value circle overlapping header/body boundary */}
-      <div className="absolute z-10 top-10 left-2 w-7 h-7 text-[10px] rounded-full font-black flex items-center justify-center bg-white"
-        style={{ border: `2px solid ${hex}`, color: '#333' }}>
-        M{card.value}
-      </div>
+        {/* Thick color inner border effect using a container */}
+        <div className="flex-1 flex flex-col p-[4px] bg-white">
+          <div className="flex-1 flex flex-col rounded-[2px]" style={{ backgroundColor: config.bg }}>
+            
+            {/* Header Area filled with color */}
+            <div className="flex flex-col items-center justify-center pt-2 pb-2 px-1 text-center min-h-[42px] border-b-2 border-[#1a1a1a]" style={{ color: config.text }}>
+              <span className="text-[5px] font-sans font-bold uppercase tracking-[0.15em] mb-0.5" style={{ textShadow: '0px 1px 1px rgba(0,0,0,0.3)' }}>
+                Title Deed
+              </span>
+              <span className="text-[8.5px] font-display font-black uppercase leading-[1.1]" style={{ textShadow: '0px 1px 1px rgba(0,0,0,0.3)' }}>
+                {card.name}
+              </span>
+            </div>
 
-      {/* Inner bordered content area */}
-      <div className="flex-1 flex flex-col mx-1.5 mb-1.5 mt-0.5"
-        style={{ border: `1.5px solid ${hex}` }}>
-        <div className="flex-1 flex flex-col px-2 pt-4 pb-1">
-          {/* Column headers */}
-          <div className="flex justify-between mb-1">
-            <span className="text-[7px] font-black text-center uppercase leading-tight" style={{ color: '#555' }}>
-              PROPERTIES<br/>OWNED
-            </span>
-            <span className="text-[7px] font-black uppercase" style={{ color: '#555' }}>
-              RENT
-            </span>
-          </div>
-
-          {/* Rent rows with stacked card icons */}
-          <div className="flex-1 flex flex-col justify-center gap-1.5">
-            {Object.entries(rentTable).map(([count, rent]) => {
-              const isComplete = Number(count) === setSize;
-              return (
-                <div key={count} className="flex items-center justify-between">
-                  <div className="relative flex items-end">
-                    {Array.from({ length: Number(count) }).map((_, i) => (
-                      <div
-                        key={i}
-                        className="rounded-[2px] flex items-center justify-center font-black text-white"
-                        style={{
-                          backgroundColor: hex,
-                          width: 16,
-                          height: 20,
-                          border: '1.5px solid white',
-                          marginLeft: i > 0 ? -6 : 0,
-                          transform: i > 0 ? `rotate(${i * 8}deg)` : undefined,
-                          zIndex: i,
-                          fontSize: 8,
-                        }}
-                      >
-                        {Number(count)}
-                      </div>
-                    ))}
-                    {isComplete && (
-                      <span className="ml-0.5 text-[8px]">✨</span>
-                    )}
-                  </div>
-                  <span className="font-black text-lg" style={{ color: '#333' }}>
-                    <span className="text-[8px] align-top">M</span>{rent}
+            {/* Content Area - White */}
+            <div className="flex-1 bg-white flex flex-col">
+              <div className="flex flex-col flex-1 px-1.5 pt-2 pb-1 bg-white">
+                <div className="flex justify-between items-end border-b-[1px] border-[#1a1a1a] pb-0.5 mb-1.5">
+                  <span className="text-[6.5px] font-display font-black text-center uppercase leading-tight text-[#1a1a1a]">
+                    Rent
                   </span>
                 </div>
-              );
-            })}
-          </div>
 
-          {/* Complete set label */}
-          <div className="text-center mt-1 pt-1">
-            <span className="text-[7px] font-black uppercase" style={{ color: '#555' }}>
-              COMPLETE SET
-            </span>
+                {/* Rent Rows */}
+                <div className="flex-1 flex flex-col justify-start gap-1">
+                  {Object.entries(rentTable).map(([count, rent]) => {
+                    const isComplete = Number(count) === setSize;
+                    return (
+                      <div key={count} className="flex items-center justify-between px-1">
+                        <div className="flex items-center gap-[2px]">
+                          {isComplete && <span className="text-[6px] text-amber-500 -ml-1">★</span>}
+                          <span className="text-[7.5px] font-sans font-bold text-[#1a1a1a]">
+                            {count} {config.label} {Number(count) > 1 ? 'Cards' : 'Card'}
+                          </span>
+                        </div>
+                        <span className="font-display font-black text-[10px] text-[#1a1a1a]">
+                          <span className="text-[7px] align-top tracking-tighter mr-[1px]">M</span>{rent}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Complete set label at bottom */}
+                <div className="text-center mt-auto border-t-[1px] border-[#1a1a1a] pt-0.5">
+                  <span className="text-[6.5px] font-display font-black uppercase tracking-wider text-[#1a1a1a]">
+                    {setSize} Cards Form A Full Set
+                  </span>
+                </div>
+              </div>
+            </div>
+            {/* End of White Content Area */}
+
           </div>
         </div>
       </div>
