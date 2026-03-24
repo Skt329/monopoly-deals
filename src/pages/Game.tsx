@@ -58,6 +58,7 @@ import { CardBack } from '@/components/game/cards/CardBack';
 import { ActionResponsePanel } from '@/components/game/ActionResponsePanel';
 import { TargetSelector } from '@/components/game/TargetSelector';
 import { DollarSign, Trophy, ChevronRight, ChevronDown, Layers, Hand, Sparkles, RefreshCw, LogOut } from 'lucide-react';
+import { GameChat } from '@/components/game/GameChat';
 
 interface FlyingCard {
   id: string;
@@ -851,14 +852,15 @@ export default function Game() {
       ))}
 
       {/* Top bar */}
-      <div className="flex items-center justify-between px-3 py-1.5 border-b bg-card shadow-sm">
-        <div className="flex items-center gap-2">
-          <h2 className="font-bold text-sm text-foreground tracking-tight">MONOPOLY DEAL</h2>
-          <Badge variant="secondary" className="font-mono text-[10px]">{roomCode}</Badge>
+      <div className="flex items-center justify-between px-2 py-1 md:px-3 md:py-1.5 border-b bg-card shadow-sm">
+        <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
+          <h2 className="font-bold text-[10px] md:text-sm text-foreground tracking-tight whitespace-nowrap">MONOPOLY DEAL</h2>
+          <Badge variant="secondary" className="font-mono text-[8px] md:text-[10px] hidden sm:inline-flex">{roomCode}</Badge>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] text-destructive hover:text-destructive">
-                <LogOut className="w-3 h-3 mr-1" /> Exit
+              <Button variant="ghost" size="sm" className="h-5 md:h-6 px-1.5 md:px-2 text-[9px] md:text-[10px] text-destructive hover:text-destructive">
+                <LogOut className="w-3 h-3" />
+                <span className="hidden sm:inline ml-1">Exit</span>
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
@@ -877,12 +879,12 @@ export default function Game() {
             </AlertDialogContent>
           </AlertDialog>
         </div>
-        <div className="flex items-center gap-2 text-sm">
-          <Badge variant={isMyTurn ? 'default' : 'secondary'} className={`text-xs ${isMyTurn ? 'animate-pulse' : ''}`}>
+        <div className="flex items-center gap-1 md:gap-2 text-sm flex-shrink-0">
+          <Badge variant={isMyTurn ? 'default' : 'secondary'} className={`text-[9px] md:text-xs ${isMyTurn ? 'animate-pulse' : ''}`}>
             {isMyTurn ? "⭐ Your Turn" : `${currentPlayerName}'s Turn`}
           </Badge>
           {isMyTurn && gameState.phase === 'playing' && (
-            <div className={`flex items-center gap-1 px-2 py-1 rounded-full font-bold text-xs border ${
+            <div className={`flex items-center gap-0.5 px-1.5 py-0.5 md:px-2 md:py-1 rounded-full font-bold text-[9px] md:text-xs border ${
               gameState.cardsPlayedThisTurn >= 3
                 ? 'bg-destructive/10 border-destructive text-destructive'
                 : gameState.cardsPlayedThisTurn >= 2
@@ -893,16 +895,16 @@ export default function Game() {
             </div>
           )}
           {doubleRentPending && (
-            <Badge variant="destructive" className="text-[10px] animate-pulse">⚡ Double Rent — Pick Rent!</Badge>
+            <Badge variant="destructive" className="text-[8px] md:text-[10px] animate-pulse">⚡ Double Rent</Badge>
           )}
           {gameState.phase === 'responding' && (
-            <Badge variant="destructive" className="text-[10px] animate-pulse">⚡ Waiting...</Badge>
+            <Badge variant="destructive" className="text-[8px] md:text-[10px] animate-pulse">⚡ Waiting...</Badge>
           )}
         </div>
       </div>
 
       {/* Opponents area - clickable to expand */}
-      <div className="flex-none flex gap-2 px-3 py-2 overflow-x-auto border-b bg-muted/30 max-h-[20vh]">
+      <div className="flex-none flex gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 md:py-2 overflow-x-auto border-b bg-muted/30 max-h-[15vh] md:max-h-[20vh]">
         {players.filter(p => p.user_id !== userId).map(player => {
           const board: PlayerBoard = gameState.boards[player.user_id] || createEmptyBoard();
           const handCount = gameState.handCounts[player.user_id] || 0;
@@ -916,7 +918,7 @@ export default function Game() {
           return (
             <div
               key={player.user_id}
-              className={`flex-none rounded-lg border p-2 cursor-pointer transition-all ${isExpanded ? 'min-w-[320px] max-w-[400px]' : 'min-w-[200px] max-w-[260px]'} ${isCurrentTurn ? 'border-primary bg-primary/5' : 'border-border bg-card'}`}
+              className={`flex-none rounded-lg border p-1.5 md:p-2 cursor-pointer transition-all ${isExpanded ? 'min-w-[240px] md:min-w-[320px] max-w-[320px] md:max-w-[400px]' : 'min-w-[140px] md:min-w-[200px] max-w-[200px] md:max-w-[260px]'} ${isCurrentTurn ? 'border-primary bg-primary/5' : 'border-border bg-card'}`}
               onClick={() => setExpandedOpponent(isExpanded ? null : player.user_id)}
             >
               <div className="flex items-center justify-between mb-1">
@@ -1023,11 +1025,11 @@ export default function Game() {
       </div>
 
       {/* Center area - more space */}
-      <div className="flex-1 flex gap-4 px-3 py-2 overflow-auto min-h-0">
+      <div className="flex-1 flex flex-col md:flex-row gap-2 md:gap-4 px-2 md:px-3 py-1.5 md:py-2 overflow-auto min-h-0">
         {/* My properties */}
-        <div className="flex-1 flex flex-col gap-1.5 overflow-y-auto min-w-0">
-          <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Your Properties</h3>
-          <div className="flex flex-wrap gap-1.5">
+        <div className="flex-1 flex flex-col gap-1 md:gap-1.5 overflow-y-auto min-w-0">
+          <h3 className="text-[9px] md:text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Your Properties</h3>
+          <div className="flex flex-wrap gap-1 md:gap-1.5">
             {(Object.keys(myBoard.properties) as PropertyColor[]).map(color => {
               const props = myBoard.properties[color] || [];
               if (props.length === 0) return null;
@@ -1085,7 +1087,7 @@ export default function Game() {
         </div>
 
         {/* Deck & Discard - center */}
-        <div className="flex flex-col items-center gap-2 flex-none" ref={deckRef}>
+        <div className="flex flex-row md:flex-col items-center gap-2 flex-none" ref={deckRef}>
           <div className="text-center">
             <CardBack count={gameState.deck.length} />
             <p className="text-[9px] text-muted-foreground mt-0.5">Draw ({gameState.deck.length})</p>
@@ -1108,10 +1110,10 @@ export default function Game() {
         </div>
 
         {/* Sets counter + End Turn */}
-        <div className="flex flex-col items-center gap-2 flex-none">
+        <div className="flex flex-row md:flex-col items-center gap-2 flex-none">
           <div className="text-center">
-            <p className="text-3xl font-bold text-foreground">{countCompleteSets(myBoard)}</p>
-            <p className="text-[10px] text-muted-foreground">/ 3 Sets</p>
+            <p className="text-xl md:text-3xl font-bold text-foreground">{countCompleteSets(myBoard)}</p>
+            <p className="text-[9px] md:text-[10px] text-muted-foreground">/ 3 Sets</p>
           </div>
           {isMyTurn && gameState.phase === 'playing' && (
             <div className="flex flex-col items-center gap-1">
@@ -1281,29 +1283,38 @@ export default function Game() {
 
       {/* My hand */}
       {!discardMode && (
-        <div ref={handRef} className="flex-none border-t bg-card/90 backdrop-blur-sm px-3 py-2 shadow-inner max-h-[35vh] overflow-y-auto">
-          <div className="flex items-center gap-2 mb-1">
+        <div ref={handRef} className="flex-none border-t bg-card/90 backdrop-blur-sm px-2 md:px-3 py-1.5 md:py-2 shadow-inner max-h-[25vh] md:max-h-[35vh] overflow-y-auto">
+          <div className="flex items-center gap-1.5 md:gap-2 mb-1">
             <Hand className="w-3 h-3 text-muted-foreground" />
-            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+            <span className="text-[9px] md:text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
               Hand ({myHand.length})
             </span>
             {doubleRentPending && (
-              <Badge variant="destructive" className="text-[9px] animate-pulse">Select a Rent card!</Badge>
+              <Badge variant="destructive" className="text-[8px] md:text-[9px] animate-pulse">Select a Rent card!</Badge>
             )}
           </div>
-          <div className="flex gap-1.5 overflow-x-auto pb-1 justify-center">
+          <div className="flex gap-1 md:gap-1.5 overflow-x-auto pb-1 snap-x snap-mandatory md:snap-none justify-start md:justify-center">
             {myHand.map((card, i) => (
-              <div key={card.uid} className="flex-none" style={{ animationDelay: `${i * 50}ms` }}>
+              <div key={card.uid} className="flex-none snap-center" style={{ animationDelay: `${i * 50}ms` }}>
                 <GameCardComponent
                   card={card}
                   onClick={() => handleCardClick(card.uid)}
                   selected={selectedCard === card.uid}
+                  small
                 />
               </div>
             ))}
           </div>
         </div>
       )}
+
+      {/* Game Chat */}
+      <GameChat
+        roomId={roomId}
+        userId={userId}
+        playerName={getPlayerName(userId)}
+        players={players}
+      />
     </div>
   );
 }
