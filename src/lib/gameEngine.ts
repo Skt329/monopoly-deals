@@ -640,7 +640,16 @@ export function payWithCards(
   }
 
   const collectorBoard = { ...state.boards[collectorId] };
-  collectorBoard.bank = [...collectorBoard.bank, ...payments];
+  // Route property cards to property pile, money/action to bank
+  const moneyPayments = payments.filter(c => c.type !== 'property' && c.type !== 'wild_property');
+  const propertyPayments = payments.filter(c => c.type === 'property' || c.type === 'wild_property');
+  collectorBoard.bank = [...collectorBoard.bank, ...moneyPayments];
+  // Add property payments to collector's property pile
+  collectorBoard.properties = { ...collectorBoard.properties };
+  for (const propCard of propertyPayments) {
+    const destColor = propCard.chosenColor || propCard.color || 'brown';
+    collectorBoard.properties[destColor] = [...(collectorBoard.properties[destColor] || []), propCard];
+  }
 
   const payerId = Object.keys(state.boards).find(
     id => state.boards[id] === payerBoard
