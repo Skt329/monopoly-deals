@@ -240,7 +240,7 @@ export default function Game() {
   }, [gameState, selectedCard, myHand, persistState, checkAutoEndTurn]);
 
   // Action card play - opens target selector if needed
-  const handlePlayAction = useCallback(() => {
+  const handlePlayAction = useCallback(async () => {
     if (!gameState || !selectedCard) return;
     const card = myHand.find(c => c.uid === selectedCard);
     if (!card) return;
