@@ -82,7 +82,7 @@ export default function Game() {
         .eq('room_id', room.id)
         .eq('user_id', user.id)
         .single();
-      if (handData) setMyHand(handData.hand as GameCard[]);
+      if (handData) setMyHand(handData.hand as unknown as GameCard[]);
     };
     init();
   }, [roomCode, navigate]);
