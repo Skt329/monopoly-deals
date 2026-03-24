@@ -11,6 +11,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import {
   type GameCard,
   type PropertyColor,
   COLOR_CONFIG,
@@ -40,12 +51,22 @@ import {
   getCompleteSetColors,
   isSetComplete,
   calculateRent,
+  removePlayer,
 } from '@/lib/gameEngine';
 import { GameCardComponent } from '@/components/game/cards/GameCardComponent';
 import { CardBack } from '@/components/game/cards/CardBack';
 import { ActionResponsePanel } from '@/components/game/ActionResponsePanel';
 import { TargetSelector } from '@/components/game/TargetSelector';
-import { DollarSign, Trophy, ChevronRight, ChevronDown, Layers, Hand, Sparkles, RefreshCw } from 'lucide-react';
+import { DollarSign, Trophy, ChevronRight, ChevronDown, Layers, Hand, Sparkles, RefreshCw, LogOut } from 'lucide-react';
+
+interface FlyingCard {
+  id: string;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  started: boolean;
+}
 
 interface Player {
   user_id: string;
