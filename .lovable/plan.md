@@ -1,43 +1,79 @@
 
 
-# Fix: Pass Go Card Mechanics & Turn Counter UI
+# Fix: Complete Action Card Mechanics
 
-## Problems
-1. **No plays counter visible** — Players can't see how many of their 3 plays they've used (the counter exists but is small and easy to miss).
-2. **Pass Go breaks the game** — Pass Go counts as 1 of 3 plays AND draws 2 cards. If those drawn cards include another Pass Go, playing it draws more. The hand can grow well beyond 7, but the current discard check only happens at end-of-turn. The player has no UI to discard excess cards, causing collapse.
+## What's Broken
 
-## Root Cause
-- `playActionCard` for Pass Go increments `cardsPlayedThisTurn` (line 237) — this is correct per rules (Pass Go IS one of your 3 plays).
-- But the discard-to-7 phase only triggers in `handleEndTurn` (line 322-327) as a blocking check. There's no discard UI — it just shows an error toast.
-- The `discardCards` function exists in the engine but is never called from Game.tsx.
+| Card | Issue |
+|------|-------|
+| **Sly Deal** | No property selection UI; accept handler doesn't transfer the property |
+| **Forced Deal** | No UI to pick your card to give + their card to take; no swap logic |
+| **Deal Breaker** | `targetColor` not stored in PendingAction; no set transfer on accept |
+| **Double The Rent** | Does nothing — needs to pair with a rent card as a combo play |
 
-## Fix Plan
+Rent calculation is correct. Just Say No works.
 
-### 1. Add prominent plays counter to the game UI
-- Show a large "1/3", "2/3", "3/3" plays counter badge near the action bar
-- Disable card interactions when 3 plays are used (already done via engine check, but add visual feedback)
-- Show "End Turn" button more prominently when plays are exhausted
+---
 
-### 2. Fix discard phase after end turn
-- When player clicks "End Turn" and hand > 7, set local phase to `'discard'` instead of just showing a toast
-- Show a discard overlay/panel where the player selects cards to discard (click cards to mark them)
-- Show count: "Discard X cards (you have Y, max 7)"
-- Confirm button calls `discardCards()` engine function, then proceeds with `endTurn()`
+## Plan
 
-### 3. Pass Go edge cases
-- Pass Go correctly uses 1 of 3 plays — no change needed there
-- The key fix is the discard mechanism: after all plays, if hand > 7, force discard before ending turn
-- Chain scenario (Pass Go → draw Pass Go → play it → draw more) works naturally since each Pass Go costs 1 play, so max 3 Pass Go's = 6 extra cards drawn in a turn
+### 1. Extend `PendingAction` type (gameEngine.ts)
+Add fields to store targeting details:
+- `targetColor?: PropertyColor` — for Deal Breaker (which complete set to steal)
+- `targetCardUid?: string` — for Sly Deal (which specific property to steal)
+- `sourceCardUid?: string` — for Forced Deal (attacker's property to give)
+- `doubleRent?: boolean` — flag for doubled rent
+
+### 2. Implement property transfer in `handleAccept` (Game.tsx)
+When target accepts (no Just Say No):
+- **Sly Deal**: Move `targetCardUid` property from target's board to attacker's board (same color group)
+- **Forced Deal**: Swap `targetCardUid` (target→attacker) and `sourceCardUid` (attacker→target)
+- **Deal Breaker**: Move entire `targetColor` property array from target's board to attacker's board
+
+### 3. Enhance TargetSelector for property-level selection
+For Sly Deal and Forced Deal, the TargetSelector needs a second step after picking a player:
+- Show the target player's properties (excluding complete sets for Sly Deal per rules)
+- Let attacker click a specific property card to select it
+- For Forced Deal: also show attacker's own properties to pick which one to give
+- For Deal Breaker: show target's complete sets only, pick a color
+
+New props: `onSelectTargetCard`, `onSelectSourceCard`, `selectedTargetCard`, `selectedSourceCard`
+
+### 4. Double The Rent combo mechanism
+**Rule**: Double The Rent must be played WITH a rent card in the same turn. It costs 1 of 3 plays and doubles the rent amount.
+
+Implementation:
+- In Game.tsx, when player selects "Double The Rent" card, check if they have a rent card in hand
+- Show a prompt to select which rent card to pair it with
+- Play both cards together (costs 2 plays total — 1 for rent, 1 for Double The Rent)
+- Set `doubleRent: true` on the PendingAction, and multiply `amountOwed` by 2
+- If no rent card available, show error toast
+
+### 5. Store targeting data in PendingAction
+Update `playActionCard` cases:
+- **Deal Breaker**: Store `targetColor` in pendingAction
+- **Sly Deal**: Add `targetCardUid` parameter, store in pendingAction
+- **Forced Deal**: Add `targetCardUid` + `sourceCardUid` parameters, store in pendingAction
+
+---
 
 ## Files to Edit
 
-**`src/pages/Game.tsx`:**
-- Add `discardMode` state and discard selection UI
-- Update `handleEndTurn` to enter discard mode when hand > 7
-- Add discard confirmation handler that calls `discardCards()` then `endTurn()`
-- Make the plays counter more prominent (larger badge, color changes at 2/3 and 3/3)
-- Auto-show "End Turn" when at 3 plays
+**`src/lib/gameEngine.ts`**:
+- Add `targetColor`, `targetCardUid`, `sourceCardUid` to `PendingAction` interface
+- Update Deal Breaker case to store `targetColor`
+- Add `targetCardUid` and `sourceCardUid` params to `playActionCard`
+- Add `resolveStealAction()` function that handles the actual property transfers for all 3 steal-type cards
 
-**`src/lib/gameEngine.ts`:**
-- Fix `discardCards` — the phase after discard should go to next player's `'drawing'` (currently it incorrectly stays as `'drawing'` for the same player if hand <= 7, instead of calling `endTurn`)
+**`src/components/game/TargetSelector.tsx`**:
+- Add property card selection step for Sly Deal (show target's non-complete-set properties)
+- Add dual property selection for Forced Deal (pick theirs + pick yours)
+- Add complete set selection for Deal Breaker (show target's complete sets only)
+- Add rent card pairing for Double The Rent
+
+**`src/pages/Game.tsx`**:
+- Update `handleConfirmTarget` to pass `targetCardUid`/`sourceCardUid` to `playActionCard`
+- Rewrite `handleAccept` to call `resolveStealAction()` for steal-type cards and actually transfer properties
+- Add Double The Rent flow: detect DTR card → show rent card picker → play both as combo
+- Update `handlePlayAction` to handle DTR specially
 
