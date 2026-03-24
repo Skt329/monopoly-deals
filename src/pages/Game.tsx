@@ -68,6 +68,14 @@ interface FlyingCard {
   started: boolean;
 }
 
+interface GameNotification {
+  id: string;
+  playerName: string;
+  action: string;
+  card?: GameCard;
+  timestamp: number;
+}
+
 interface Player {
   user_id: string;
   display_name: string;
@@ -107,6 +115,7 @@ export default function Game() {
   const deckRef = useRef<HTMLDivElement>(null);
   const handRef = useRef<HTMLDivElement>(null);
   const movesChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const [gameNotifications, setGameNotifications] = useState<GameNotification[]>([]);
 
   // Helper to get player display name
   const getPlayerName = useCallback((pid: string) => {
@@ -215,19 +224,29 @@ export default function Game() {
     const movesChannel = supabase.channel(`game-moves-${roomId}`);
     movesChannel.on('broadcast', { event: 'move' }, ({ payload }) => {
       if (payload.playerId !== userId) {
-        toast.info(`${payload.playerName}: ${payload.action}`, { duration: 2500 });
+        const notif: GameNotification = {
+          id: `${Date.now()}-${Math.random()}`,
+          playerName: payload.playerName,
+          action: payload.action,
+          card: payload.card || undefined,
+          timestamp: Date.now(),
+        };
+        setGameNotifications(prev => [...prev.slice(-4), notif]);
+        setTimeout(() => {
+          setGameNotifications(prev => prev.filter(n => n.id !== notif.id));
+        }, 3500);
       }
     }).subscribe();
     movesChannelRef.current = movesChannel;
     return () => { supabase.removeChannel(movesChannel); };
   }, [roomId, userId]);
 
-  const broadcastMove = useCallback((action: string) => {
+  const broadcastMove = useCallback((action: string, card?: GameCard) => {
     const name = getPlayerName(userId);
     movesChannelRef.current?.send({
       type: 'broadcast',
       event: 'move',
-      payload: { playerId: userId, playerName: name, action },
+      payload: { playerId: userId, playerName: name, action, card: card || null },
     });
   }, [userId, getPlayerName]);
 
@@ -318,7 +337,7 @@ export default function Game() {
     setSelectedCard(null);
     setShowColorPicker(false);
     await persistState(result.state, result.hand);
-    broadcastMove(`played ${card?.name || 'property'} as ${COLOR_CONFIG[color].label} property`);
+    broadcastMove(`played ${card?.name || 'property'} as ${COLOR_CONFIG[color].label} property`, card || undefined);
 
     if (result.state.winner) {
       toast.success('🎉 You completed 3 sets! YOU WIN!', { duration: 10000 });
@@ -335,7 +354,7 @@ export default function Game() {
     if (!result) { toast.error('Cannot play this card'); return; }
     setSelectedCard(null);
     await persistState(result.state, result.hand);
-    broadcastMove(`added M${card?.value || 0} to bank`);
+    broadcastMove(`added M${card?.value || 0} to bank`, card || undefined);
     toast.success('Added to bank!');
     await checkAutoEndTurn(result.state, result.hand);
   }, [gameState, selectedCard, myHand, persistState, checkAutoEndTurn, broadcastMove]);
@@ -533,12 +552,13 @@ export default function Game() {
     setDoubleRentPending(false);
     setDoubleRentCardUid(null);
     await persistState(result.state, result.hand);
-    broadcastMove(`played ${card.name}${selectedTarget ? ` on ${getPlayerName(selectedTarget)}` : ''}${doubleRentPending ? ' (DOUBLED!)' : ''}`);
-    toast.success(`${card.name} played!${doubleRentPending ? ' (DOUBLED!)' : ''}`);
+    const rentAmount = result.state.pendingAction?.amountOwed;
+    broadcastMove(`played ${card.name}${selectedTarget ? ` on ${getPlayerName(selectedTarget)}` : ''}${rentAmount ? ` (M${rentAmount})` : ''}${doubleRentPending ? ' (DOUBLED!)' : ''}`, card);
+    toast.success(`${card.name} played!${rentAmount ? ` Collecting M${rentAmount}` : ''}${doubleRentPending ? ' (DOUBLED!)' : ''}`);
     // Trigger celebrations
     const celebrationMap: Record<string, { msg: string; emoji: string }> = {
-      'Rent': { msg: `Collecting Rent!`, emoji: '💰' },
-      'Wild Rent': { msg: `Collecting Rent!`, emoji: '💰' },
+      'Rent': { msg: `Collecting M${rentAmount || '?'} Rent!`, emoji: '💰' },
+      'Wild Rent': { msg: `Collecting M${rentAmount || '?'} Rent!`, emoji: '💰' },
       'Sly Deal': { msg: 'Property Stolen!', emoji: '🕵️' },
       'Deal Breaker': { msg: 'Complete Set Stolen!', emoji: '💥' },
       'Forced Deal': { msg: 'Properties Swapped!', emoji: '🔄' },
@@ -754,6 +774,25 @@ export default function Game() {
           </div>
         </div>
       )}
+
+      {/* Center-screen notifications */}
+      {gameNotifications.length > 0 && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[55] flex flex-col gap-2 pointer-events-none">
+          {gameNotifications.map(notif => (
+            <div key={notif.id} className="animate-in slide-in-from-top-4 fade-in duration-300 bg-card/95 backdrop-blur-md border-2 border-primary/50 rounded-xl shadow-2xl px-4 py-3 flex items-center gap-3 min-w-[280px] max-w-[400px]">
+              {notif.card && (
+                <div className="flex-none">
+                  <GameCardComponent card={notif.card} small />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-black text-primary truncate">{notif.playerName}</p>
+                <p className="text-[11px] text-foreground font-medium">{notif.action}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       {/* Action Response Panel */}
       {gameState.phase === 'responding' && gameState.pendingAction && (
         <ActionResponsePanel
@@ -863,7 +902,7 @@ export default function Game() {
       </div>
 
       {/* Opponents area - clickable to expand */}
-      <div className="flex-none flex gap-2 px-3 py-2 overflow-x-auto border-b bg-muted/30">
+      <div className="flex-none flex gap-2 px-3 py-2 overflow-x-auto border-b bg-muted/30 max-h-[20vh]">
         {players.filter(p => p.user_id !== userId).map(player => {
           const board: PlayerBoard = gameState.boards[player.user_id] || createEmptyBoard();
           const handCount = gameState.handCounts[player.user_id] || 0;
@@ -1124,30 +1163,25 @@ export default function Game() {
                   )}
 
                   {previewCard.type === 'wild_property' && (
-                    <>
-                      <div className="flex flex-col gap-1">
-                        <Button size="sm" variant="outline" className="w-full" onClick={() => setShowColorPicker(!showColorPicker)}>
-                          Play as Property
-                        </Button>
-                        {showColorPicker && (
-                          <div className="flex gap-1 justify-center flex-wrap">
-                            {previewCard.colors?.map(color => (
-                              <button
-                                key={color}
-                                onClick={() => { setPreviewCard(null); handlePlayAsProperty(color); }}
-                                className={`${COLOR_CONFIG[color].bg} px-2 py-1 rounded text-[10px] font-bold ${COLOR_CONFIG[color].text} hover:scale-110 transition-transform`}
-                                title={COLOR_CONFIG[color].label}
-                              >
-                                {COLOR_CONFIG[color].label}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <Button size="sm" variant="secondary" className="w-full" onClick={() => { setPreviewCard(null); handlePlayAsMoney(); }}>
-                        Play as Money (M{previewCard.value})
+                    <div className="flex flex-col gap-1">
+                      <Button size="sm" variant="outline" className="w-full" onClick={() => setShowColorPicker(!showColorPicker)}>
+                        Play as Property
                       </Button>
-                    </>
+                      {showColorPicker && (
+                        <div className="flex gap-1 justify-center flex-wrap">
+                          {previewCard.colors?.map(color => (
+                            <button
+                              key={color}
+                              onClick={() => { setPreviewCard(null); handlePlayAsProperty(color); }}
+                              className={`${COLOR_CONFIG[color].bg} px-2 py-1 rounded text-[10px] font-bold ${COLOR_CONFIG[color].text} hover:scale-110 transition-transform`}
+                              title={COLOR_CONFIG[color].label}
+                            >
+                              {COLOR_CONFIG[color].label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
 
                   {previewCard.type === 'action' && !doubleRentPending && (
@@ -1247,7 +1281,7 @@ export default function Game() {
 
       {/* My hand */}
       {!discardMode && (
-        <div ref={handRef} className="flex-none border-t bg-card/90 backdrop-blur-sm px-3 py-2 shadow-inner">
+        <div ref={handRef} className="flex-none border-t bg-card/90 backdrop-blur-sm px-3 py-2 shadow-inner max-h-[35vh] overflow-y-auto">
           <div className="flex items-center gap-2 mb-1">
             <Hand className="w-3 h-3 text-muted-foreground" />
             <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
