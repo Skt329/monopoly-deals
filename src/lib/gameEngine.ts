@@ -518,7 +518,9 @@ export function calculateRent(board: PlayerBoard, color: PropertyColor): number 
   if (propCount === 0) return 0;
 
   const rentTable = PROPERTY_SETS[color].rent;
-  let rent = rentTable[propCount] || 0;
+  // Clamp to max set size so extra wilds don't return undefined/0
+  const clampedCount = Math.min(propCount, PROPERTY_SETS[color].size);
+  let rent = rentTable[clampedCount] || 0;
 
   if (board.hasHouse[color]) rent += 3;
   if (board.hasHotel[color]) rent += 4;
