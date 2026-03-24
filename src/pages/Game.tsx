@@ -904,7 +904,7 @@ export default function Game() {
       </div>
 
       {/* Opponents area - clickable to expand */}
-      <div className="flex-none flex gap-2 px-3 py-2 overflow-x-auto border-b bg-muted/30 max-h-[20vh]">
+      <div className="flex-none flex gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 md:py-2 overflow-x-auto border-b bg-muted/30 max-h-[15vh] md:max-h-[20vh]">
         {players.filter(p => p.user_id !== userId).map(player => {
           const board: PlayerBoard = gameState.boards[player.user_id] || createEmptyBoard();
           const handCount = gameState.handCounts[player.user_id] || 0;
