@@ -19,6 +19,9 @@ interface ActionResponsePanelProps {
 export function ActionResponsePanel({
   gameState, userId, myHand, myBoard, players, onPay, onJustSayNo, onAccept
 }: ActionResponsePanelProps) {
+  const [selectedBankCards, setSelectedBankCards] = useState<string[]>([]);
+  const [selectedProps, setSelectedProps] = useState<{ uid: string; color: PropertyColor }[]>([]);
+
   const pending = gameState.pendingAction;
   if (!pending) return null;
 
@@ -27,9 +30,6 @@ export function ActionResponsePanel({
 
   const sourceName = players.find(p => p.user_id === pending.sourcePlayerId)?.display_name || 'Unknown';
   const hasJustSayNo = myHand.some(c => c.name === 'Just Say No');
-
-  const [selectedBankCards, setSelectedBankCards] = useState<string[]>([]);
-  const [selectedProps, setSelectedProps] = useState<{ uid: string; color: PropertyColor }[]>([]);
 
   const totalSelected = selectedBankCards.reduce((sum, uid) => {
     const card = myBoard.bank.find(c => c.uid === uid);
