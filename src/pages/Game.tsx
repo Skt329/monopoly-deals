@@ -533,6 +533,7 @@ export default function Game() {
     setDoubleRentPending(false);
     setDoubleRentCardUid(null);
     await persistState(result.state, result.hand);
+    broadcastMove(`played ${card.name}${selectedTarget ? ` on ${getPlayerName(selectedTarget)}` : ''}${doubleRentPending ? ' (DOUBLED!)' : ''}`);
     toast.success(`${card.name} played!${doubleRentPending ? ' (DOUBLED!)' : ''}`);
     // Trigger celebrations
     const celebrationMap: Record<string, { msg: string; emoji: string }> = {
