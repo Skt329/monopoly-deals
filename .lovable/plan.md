@@ -1,102 +1,81 @@
 
 
-# Complete Game UI Redesign + 6 Fixes
+# Implementation Plan: 7 Fixes for Game Mechanics and UI
 
-## Problems to Fix
+## 1. Multi-color Rent Card Filtering
 
-1. **Card draw animation** — Current dealing animation is basic fade-in of CardBacks. Need a real deck-to-player animation visible to all players with cards flying from the deck position.
-2. **Action card info broadcasting** — No game log or notification system. When someone plays Forced Deal/Sly Deal/Deal Breaker, opponents don't see details of what's being stolen/exchanged. Need a game activity feed visible to all players.
-3. **Move notifications** — No messages when any player plays a property or money card. Need turn-by-turn activity log.
-4. **Exit game button** — No way to leave mid-game. Need exit button + auto-end if only 1 player remains + return cards to deck.
-5. **Property card play options** — Property cards (type `'property'`) currently only show "Play as Property" (line 990-993) which is correct. But need to verify no regression.
-6. **Property pile card details** — Player's own property cards use `small` prop (line 872) showing only abbreviated names. Need clickable full-detail cards. Same for opponent cards in expanded view.
+**Problem**: Rent/Wild Rent color picker shows ALL colors, even ones the player has no properties for, resulting in 0M rent.
 
-## Full UI Redesign
+**Fix in `src/components/game/TargetSelector.tsx`**:
+- Add `currentPlayerBoard` prop
+- For `Rent`/`Wild Rent` color selection, filter `availableColors` to only colors where `currentPlayerBoard.properties[color].length > 0`
 
-The current layout is cramped with tiny text, poor visual hierarchy, and wasted space. Redesign from scratch with a game-table aesthetic.
+**Fix in `src/pages/Game.tsx`**:
+- Pass `currentPlayerBoard={myBoard}` to `TargetSelector`
+- In `handlePlayAction` for Rent cards: check player has properties in at least one of the card's colors before opening selector
 
-### New Layout Structure
-```text
-┌─────────────────────────────────────────────┐
-│ Top Bar: Game title, room code, turn info,  │
-│          plays counter, exit button         │
-├─────────────────────────────────────────────┤
-│  Opponents (horizontal scroll)              │
-│  [Player cards as compact panels, click     │
-│   to expand into a side sheet/dialog]       │
-├─────────────────────────────────────────────┤
-│                                             │
-│  Main Play Area (green felt background)     │
-│  ┌────────┐  ┌──────────────────────────┐   │
-│  │ Deck   │  │ Your Properties          │   │
-│  │ Discard│  │ (grouped by color,       │   │
-│  │ Sets/3 │  │  full-size clickable)    │   │
-│  │ End Trn│  │                          │   │
-│  └────────┘  │ Bank (stacked w/ total)  │   │
-│              └──────────────────────────┘   │
-│                                             │
-│  Game Activity Log (scrollable sidebar)     │
-│                                             │
-├─────────────────────────────────────────────┤
-│ Your Hand (cards in a fan/row, click to     │
-│ preview enlarged card with action buttons)  │
-└─────────────────────────────────────────────┘
-```
+## 2. Opponent Card Details (Expandable)
 
-### Design Decisions
-- **Green felt table** background for the play area (`bg-emerald-900/95`)
-- **Gold accents** for complete sets
-- **Game activity log** as a collapsible right sidebar showing all moves
-- Cards in hand slightly overlap (fan effect) to save space
-- Property groups render cards at a medium size (not tiny `small`, not full 150% preview)
+**Fix in `src/pages/Game.tsx`**:
+- Add `expandedOpponent` state (`string | null`)
+- Clicking an opponent panel toggles expansion showing full property cards (using `GameCardComponent small`) and bank cards
+- Clicking any opponent card opens the existing `previewCard` dialog in read-only mode (no action buttons since it's not your card)
 
----
+## 3. Property Paid as Rent Goes to Property Pile
 
-## Implementation Plan
+**Fix in `src/lib/gameEngine.ts` `payWithCards()`**:
+- Currently line 627 puts ALL payments into `collectorBoard.bank`
+- Split payments: money/action cards → bank, property/wild_property cards → collector's property pile under their original color (using `addPropertyCard`)
 
-### Files to Edit
+## 4. Full Property Card Rendering + Clickable Opponent Sections
 
-#### `src/pages/Game.tsx` — Complete rewrite of render section
-- **Game activity log**: Add `gameLog` state (`{player: string, action: string, detail: string, timestamp: number}[]`). Append entries when actions are played. Persist log in game state or broadcast via realtime.
-- **Card draw animation**: Replace the dealing screen with an in-game animation. When `handleDraw` fires, show cards flying from the deck area to the hand area using CSS keyframes (`@keyframes flyToHand`). All players see a notification "[Player] drew 2 cards" in the log.
-- **Exit button**: Add "Exit Game" button in top bar. On click, confirm dialog. On confirm: remove player from `game_players`, return their hand cards to the deck in `game_state`, broadcast "[Player] left the game". If only 1 player remains, set `winner` to that player.
-- **Property card display**: Remove `small` prop from player's own property cards (line 872). Use a medium size. Make each card clickable to open the preview dialog.
-- **Opponent expansion**: Change from inline expansion to a `Sheet` (slide-in panel) showing full opponent board details. Cards clickable for preview (read-only).
-- **Move notifications**: After every play action (property, money, action card), append to `gameLog` and broadcast via game state. Show as toast AND in the log sidebar.
-- **Action detail messages**: When Sly Deal/Forced Deal/Deal Breaker is played, the pending action already stores `targetCardUid`/`sourceCardUid`/`targetColor`. Show detailed messages in the response panel: "Player X wants to steal [Card Name] from you" / "Player X wants to swap [Their Card] for [Your Card]".
-- **New layout**: Complete JSX restructure with the green felt table design, better spacing, responsive grid.
+**Fix in `src/pages/Game.tsx`**:
+- Player's own properties (line 728): remove `small` prop so cards render at full size with rent tables visible
+- Adjust layout: wrap property groups in a scrollable flex container
+- Opponent expanded view: show full-size cards when expanded
 
-#### `src/lib/gameEngine.ts`
-- Add `gameLog` array to `PublicGameState` type
-- Add helper `addLogEntry(state, entry)` to append log entries
-- Add `removePlayer(state, playerId)` function that returns cards to deck and removes player from order
+## 5. Action Celebrations
 
-#### `src/index.css`
-- Add `@keyframes flyToHand` animation for card drawing
-- Add green felt background pattern
-- Add card fan overlap styles
+**Fix in `src/pages/Game.tsx`**:
+- Add `celebration` state: `{ type: string; message: string; emoji: string } | null`
+- Create a `CelebrationOverlay` component rendered at z-60 with unique animations per action:
+  - Pass Go: "🎉 Drew 2 Cards!" fade-in/scale
+  - Rent: "💰 Collecting M{amount}!" with pulse
+  - Sly Deal: "🕵️ Property Stolen!"
+  - Deal Breaker: "💥 Complete Set Stolen!"
+  - Birthday: "🎂 Happy Birthday!"
+  - Forced Deal: "🔄 Properties Swapped!"
+  - House: "🏠 House Added!"
+  - Hotel: "🏨 Hotel Added!"
+- Auto-dismiss after 2s with `setTimeout`
+- Trigger in `handleConfirmTarget`, `handlePlayAction`, `handleAccept`
 
-#### `src/components/game/ActionResponsePanel.tsx`
-- Enhance messages to show specific card/property names being stolen/exchanged (use `targetCardUid` to look up card name from target's board)
+## 6. House/Hotel Fixes
 
-### Key Technical Details
+**Fix in `src/lib/gameEngine.ts`**:
+- House/Hotel cases (lines 368-387): do NOT add card to `discardPile` (remove from line 240's blanket discard). Instead add the card to `board.properties[targetColor]` so it's visually attached to the set
+- This requires moving the `discardPile` push to be per-case instead of blanket at line 240
 
-**Game Log Broadcasting**: Store `gameLog` entries in `PublicGameState` so all players see them via realtime sync. Each entry: `{ playerId, playerName, action, detail, timestamp }`.
+**Fix in `src/pages/Game.tsx`**:
+- House gate in `handlePlayAction`: require at least one complete set, show error if none
+- Hotel gate: require a complete set WITH a house, show error if none
 
-**Card Draw Animation**: Use CSS `transform` with `position: fixed` to animate a CardBack from the deck's DOM position to the hand area. Use `getBoundingClientRect()` on the deck element and hand element to calculate start/end positions. Show for 600ms then add cards to hand state.
+**Fix in `src/components/game/TargetSelector.tsx`**:
+- For `House` color selection: filter to only complete sets without a house
+- For `Hotel` color selection: filter to only complete sets with a house but no hotel
 
-**Exit Game Flow**:
-1. Player clicks Exit → confirmation dialog
-2. On confirm: call `removePlayer()` engine function
-3. Persist updated state, delete player's hand row
-4. If `playerOrder.length === 1`, auto-set winner
-5. All other players see "[Name] left the game" in log
+## 7. Opponent Complete Set Highlighting
 
-**Activity Log Entry Examples**:
-- "Alice played Baltic Avenue as property"
-- "Bob added M5 to bank"
-- "Charlie charged M6 rent on Red properties"
-- "Alice used Sly Deal to steal Connecticut Ave from Bob"
-- "Dave left the game"
-- "Eve drew 2 cards"
+**Fix in `src/pages/Game.tsx`**:
+- In opponent section, split properties into two groups: complete sets first with gold highlight/glow, then in-progress sets
+- Complete sets get `ring-2 ring-yellow-400 bg-yellow-50/80 shadow-lg` styling
+- Add "✨ Complete" label
+
+## Files to Edit
+
+| File | Changes |
+|------|---------|
+| `src/lib/gameEngine.ts` | `payWithCards` routes properties to property pile; `playActionCard` House/Hotel don't go to discard pile, card goes onto set |
+| `src/components/game/TargetSelector.tsx` | Add `currentPlayerBoard` prop; filter rent colors to owned properties; filter House/Hotel to valid sets |
+| `src/pages/Game.tsx` | Rent gate check; expandable opponents; full-size property cards; celebration overlay; House/Hotel gates; complete set highlighting |
 
