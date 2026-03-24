@@ -224,7 +224,17 @@ export default function Game() {
     const movesChannel = supabase.channel(`game-moves-${roomId}`);
     movesChannel.on('broadcast', { event: 'move' }, ({ payload }) => {
       if (payload.playerId !== userId) {
-        toast.info(`${payload.playerName}: ${payload.action}`, { duration: 2500 });
+        const notif: GameNotification = {
+          id: `${Date.now()}-${Math.random()}`,
+          playerName: payload.playerName,
+          action: payload.action,
+          card: payload.card || undefined,
+          timestamp: Date.now(),
+        };
+        setGameNotifications(prev => [...prev.slice(-4), notif]);
+        setTimeout(() => {
+          setGameNotifications(prev => prev.filter(n => n.id !== notif.id));
+        }, 3500);
       }
     }).subscribe();
     movesChannelRef.current = movesChannel;
