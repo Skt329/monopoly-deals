@@ -92,38 +92,9 @@ export function GameChat({ roomId, userId, playerName, players, variant = 'float
     return PLAYER_COLORS[idx % PLAYER_COLORS.length];
   };
 
-  // Top bar trigger button (for use in the top bar)
-  if (variant === 'topbar' && !isOpen) {
-    return (
-      <button
-        onClick={toggleOpen}
-        className="relative flex items-center justify-center w-7 h-7 md:w-8 md:h-8 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors"
-      >
-        <MessageCircle className="w-4 h-4 text-primary" />
-        {unreadCount > 0 && (
-          <Badge className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-[8px] px-1 py-0 min-w-[16px] h-[16px] flex items-center justify-center">
-            {unreadCount}
-          </Badge>
-        )}
-      </button>
-    );
-  }
-
-  // Floating trigger button (mobile)
-  if (variant === 'floating' && !isOpen) {
-    return (
-      <button
-        onClick={toggleOpen}
-        className="fixed bottom-20 right-3 z-50 bg-primary text-primary-foreground rounded-full w-10 h-10 flex items-center justify-center shadow-lg hover:scale-110 transition-transform md:hidden"
-      >
-        <MessageCircle className="w-5 h-5" />
-        {unreadCount > 0 && (
-          <Badge className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-[9px] px-1.5 py-0 min-w-[18px] h-[18px] flex items-center justify-center">
-            {unreadCount}
-          </Badge>
-        )}
-      </button>
-    );
+  // Top bar trigger is handled by Game.tsx
+  if (!isOpen) {
+    return null;
   }
 
   // Chat panel content (shared between variants)
