@@ -116,10 +116,10 @@ export default function Lobby() {
       gameState.roomId = room.id;
 
       // Save game state
-      const { error: stateError } = await supabase.from('game_states').insert({
+      const { error: stateError } = await supabase.from('game_states').insert([{
         room_id: room.id,
-        current_state: gameState,
-      });
+        current_state: gameState as unknown as import('@/integrations/supabase/types').Json,
+      }]);
       if (stateError) throw stateError;
 
       // Save each player's hand
