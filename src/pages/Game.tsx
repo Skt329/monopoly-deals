@@ -55,6 +55,8 @@ export default function Game() {
   const [targetAction, setTargetAction] = useState<string>('');
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<PropertyColor | null>(null);
+  const [discardMode, setDiscardMode] = useState(false);
+  const [discardSelected, setDiscardSelected] = useState<string[]>([]);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   // Initialize
