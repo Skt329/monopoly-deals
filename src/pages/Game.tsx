@@ -11,6 +11,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import {
   type GameCard,
   type PropertyColor,
   COLOR_CONFIG,
@@ -40,12 +51,22 @@ import {
   getCompleteSetColors,
   isSetComplete,
   calculateRent,
+  removePlayer,
 } from '@/lib/gameEngine';
 import { GameCardComponent } from '@/components/game/cards/GameCardComponent';
 import { CardBack } from '@/components/game/cards/CardBack';
 import { ActionResponsePanel } from '@/components/game/ActionResponsePanel';
 import { TargetSelector } from '@/components/game/TargetSelector';
-import { DollarSign, Trophy, ChevronRight, ChevronDown, Layers, Hand, Sparkles, RefreshCw } from 'lucide-react';
+import { DollarSign, Trophy, ChevronRight, ChevronDown, Layers, Hand, Sparkles, RefreshCw, LogOut } from 'lucide-react';
+
+interface FlyingCard {
+  id: string;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  started: boolean;
+}
 
 interface Player {
   user_id: string;
@@ -76,13 +97,21 @@ export default function Game() {
   const [discardSelected, setDiscardSelected] = useState<string[]>([]);
   const [doubleRentPending, setDoubleRentPending] = useState(false);
   const [doubleRentCardUid, setDoubleRentCardUid] = useState<string | null>(null);
-  // Rearrange wild property state
   const [rearrangeCardUid, setRearrangeCardUid] = useState<string | null>(null);
   const [rearrangeCard, setRearrangeCard] = useState<GameCard | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const forceEndRef = useRef(false);
   const [expandedOpponent, setExpandedOpponent] = useState<string | null>(null);
   const [celebration, setCelebration] = useState<{ type: string; message: string; emoji: string } | null>(null);
+  const [flyingCards, setFlyingCards] = useState<FlyingCard[]>([]);
+  const deckRef = useRef<HTMLDivElement>(null);
+  const handRef = useRef<HTMLDivElement>(null);
+  const movesChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  // Helper to get player display name
+  const getPlayerName = useCallback((pid: string) => {
+    return players.find(p => p.user_id === pid)?.display_name || 'Unknown';
+  }, [players]);
 
   // Initialize
   useEffect(() => {
@@ -180,6 +209,28 @@ export default function Game() {
     };
   }, [roomId, userId]);
 
+  // Broadcast channel for move notifications
+  useEffect(() => {
+    if (!roomId) return;
+    const movesChannel = supabase.channel(`game-moves-${roomId}`);
+    movesChannel.on('broadcast', { event: 'move' }, ({ payload }) => {
+      if (payload.playerId !== userId) {
+        toast.info(`${payload.playerName}: ${payload.action}`, { duration: 2500 });
+      }
+    }).subscribe();
+    movesChannelRef.current = movesChannel;
+    return () => { supabase.removeChannel(movesChannel); };
+  }, [roomId, userId]);
+
+  const broadcastMove = useCallback((action: string) => {
+    const name = getPlayerName(userId);
+    movesChannelRef.current?.send({
+      type: 'broadcast',
+      event: 'move',
+      payload: { playerId: userId, playerName: name, action },
+    });
+  }, [userId, getPlayerName]);
+
   // Poll for game state changes as backup (every 3s)
   useEffect(() => {
     if (!roomId || !userId) return;
@@ -209,13 +260,39 @@ export default function Game() {
     ]);
   }, [roomId, userId]);
 
+  // Flying card animation helper
+  const animateCardDraw = useCallback((count: number) => {
+    const deckEl = deckRef.current;
+    const handEl = handRef.current;
+    if (!deckEl || !handEl) return;
+    const deckRect = deckEl.getBoundingClientRect();
+    const handRect = handEl.getBoundingClientRect();
+    const cards: FlyingCard[] = [];
+    for (let i = 0; i < count; i++) {
+      cards.push({
+        id: `fly-${Date.now()}-${i}`,
+        startX: deckRect.left + deckRect.width / 2,
+        startY: deckRect.top + deckRect.height / 2,
+        endX: handRect.left + handRect.width / 2 + (i - count / 2) * 40,
+        endY: handRect.top,
+        started: false,
+      });
+    }
+    setFlyingCards(cards);
+    requestAnimationFrame(() => {
+      setFlyingCards(prev => prev.map(c => ({ ...c, started: true })));
+    });
+    setTimeout(() => setFlyingCards([]), 700);
+  }, []);
+
   const handleDraw = useCallback(async () => {
     if (!gameState || !isMyTurn || gameState.phase !== 'drawing') return;
     const result = drawCards(gameState, myHand);
+    animateCardDraw(result.drawnCards.length);
     await persistState(result.state, result.hand);
+    broadcastMove(`drew ${result.drawnCards.length} cards`);
     toast.success(`Drew ${result.drawnCards.length} cards`);
-    triggerCelebration('pass_go', `Drew ${result.drawnCards.length} Cards!`, '🎉');
-  }, [gameState, isMyTurn, myHand, persistState]);
+  }, [gameState, isMyTurn, myHand, persistState, animateCardDraw, broadcastMove]);
 
   // Check if turn should auto-end or discard after a play
   const checkAutoEndTurn = useCallback(async (newState: PublicGameState, newHand: GameCard[]) => {
@@ -235,11 +312,13 @@ export default function Game() {
 
   const handlePlayAsProperty = useCallback(async (color: PropertyColor) => {
     if (!gameState || !selectedCard) return;
+    const card = myHand.find(c => c.uid === selectedCard);
     const result = playCardAsProperty(gameState, myHand, selectedCard, color);
     if (!result) { toast.error('Cannot play this card'); return; }
     setSelectedCard(null);
     setShowColorPicker(false);
     await persistState(result.state, result.hand);
+    broadcastMove(`played ${card?.name || 'property'} as ${COLOR_CONFIG[color].label} property`);
 
     if (result.state.winner) {
       toast.success('🎉 You completed 3 sets! YOU WIN!', { duration: 10000 });
@@ -247,17 +326,19 @@ export default function Game() {
       toast.success('Property played!');
       await checkAutoEndTurn(result.state, result.hand);
     }
-  }, [gameState, selectedCard, myHand, persistState, checkAutoEndTurn]);
+  }, [gameState, selectedCard, myHand, persistState, checkAutoEndTurn, broadcastMove]);
 
   const handlePlayAsMoney = useCallback(async () => {
     if (!gameState || !selectedCard) return;
+    const card = myHand.find(c => c.uid === selectedCard);
     const result = playCardAsMoney(gameState, myHand, selectedCard);
     if (!result) { toast.error('Cannot play this card'); return; }
     setSelectedCard(null);
     await persistState(result.state, result.hand);
+    broadcastMove(`added M${card?.value || 0} to bank`);
     toast.success('Added to bank!');
     await checkAutoEndTurn(result.state, result.hand);
-  }, [gameState, selectedCard, myHand, persistState, checkAutoEndTurn]);
+  }, [gameState, selectedCard, myHand, persistState, checkAutoEndTurn, broadcastMove]);
 
   const triggerCelebration = useCallback((type: string, message: string, emoji: string) => {
     setCelebration({ type, message, emoji });
@@ -452,6 +533,7 @@ export default function Game() {
     setDoubleRentPending(false);
     setDoubleRentCardUid(null);
     await persistState(result.state, result.hand);
+    broadcastMove(`played ${card.name}${selectedTarget ? ` on ${getPlayerName(selectedTarget)}` : ''}${doubleRentPending ? ' (DOUBLED!)' : ''}`);
     toast.success(`${card.name} played!${doubleRentPending ? ' (DOUBLED!)' : ''}`);
     // Trigger celebrations
     const celebrationMap: Record<string, { msg: string; emoji: string }> = {
@@ -545,6 +627,17 @@ export default function Game() {
     await persistState(newState, myHand);
     toast.info('Action accepted — properties transferred');
   }, [gameState, userId, myHand, persistState]);
+
+  // Exit game handler
+  const handleExitGame = useCallback(async () => {
+    if (!gameState || !roomId) return;
+    const newState = removePlayer(gameState, userId, myHand);
+    broadcastMove('left the game');
+    // Persist the new state for remaining players
+    await supabase.from('game_states').update({ current_state: newState as unknown as import('@/integrations/supabase/types').Json }).eq('room_id', roomId);
+    toast.info('You left the game');
+    navigate('/');
+  }, [gameState, userId, myHand, roomId, navigate, broadcastMove]);
 
   const handleEndTurn = useCallback(async () => {
     if (!gameState || !isMyTurn) return;
@@ -702,11 +795,48 @@ export default function Game() {
         />
       )}
 
+      {/* Flying cards animation */}
+      {flyingCards.length > 0 && flyingCards.map(fc => (
+        <div
+          key={fc.id}
+          className="fixed z-[70] pointer-events-none"
+          style={{
+            left: fc.started ? fc.endX - 32 : fc.startX - 32,
+            top: fc.started ? fc.endY - 48 : fc.startY - 48,
+            transition: 'all 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+            opacity: fc.started ? 0.3 : 1,
+          }}
+        >
+          <CardBack />
+        </div>
+      ))}
+
       {/* Top bar */}
       <div className="flex items-center justify-between px-3 py-1.5 border-b bg-card shadow-sm">
         <div className="flex items-center gap-2">
           <h2 className="font-bold text-sm text-foreground tracking-tight">MONOPOLY DEAL</h2>
           <Badge variant="secondary" className="font-mono text-[10px]">{roomCode}</Badge>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] text-destructive hover:text-destructive">
+                <LogOut className="w-3 h-3 mr-1" /> Exit
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Exit Game?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Your cards will be returned to the deck. If you're the last player, the game ends. This cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleExitGame} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  Leave Game
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
         <div className="flex items-center gap-2 text-sm">
           <Badge variant={isMyTurn ? 'default' : 'secondary'} className={`text-xs ${isMyTurn ? 'animate-pulse' : ''}`}>
@@ -868,7 +998,7 @@ export default function Game() {
                 <div key={color} className={`rounded-lg p-1.5 border ${isComplete ? 'border-yellow-400 shadow-md bg-yellow-50' : 'border-border'}`}>
                   <div className="flex gap-0.5 mb-0.5">
                     {props.map(card => (
-                      <div key={card.uid} className="relative group">
+                      <div key={card.uid} className="relative group cursor-pointer" onClick={() => setPreviewCard(card)}>
                         <GameCardComponent card={card} small />
                         {/* Rearrange button for wild properties */}
                         {card.type === 'wild_property' && isMyTurn && (
@@ -916,7 +1046,7 @@ export default function Game() {
         </div>
 
         {/* Deck & Discard - center */}
-        <div className="flex flex-col items-center gap-2 flex-none">
+        <div className="flex flex-col items-center gap-2 flex-none" ref={deckRef}>
           <div className="text-center">
             <CardBack count={gameState.deck.length} />
             <p className="text-[9px] text-muted-foreground mt-0.5">Draw ({gameState.deck.length})</p>
@@ -1117,7 +1247,7 @@ export default function Game() {
 
       {/* My hand */}
       {!discardMode && (
-        <div className="flex-none border-t bg-card/90 backdrop-blur-sm px-3 py-2 shadow-inner">
+        <div ref={handRef} className="flex-none border-t bg-card/90 backdrop-blur-sm px-3 py-2 shadow-inner">
           <div className="flex items-center gap-2 mb-1">
             <Hand className="w-3 h-3 text-muted-foreground" />
             <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">

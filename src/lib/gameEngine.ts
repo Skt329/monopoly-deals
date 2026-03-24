@@ -736,3 +736,60 @@ export function anyOpponentHasStealable(boards: Record<string, PlayerBoard>, cur
     return getStealableProperties(boards[pid]).length > 0;
   });
 }
+
+/** Remove a player from the game, returning their cards to the deck */
+export function removePlayer(
+  state: PublicGameState,
+  playerId: string,
+  playerHand: GameCard[]
+): PublicGameState {
+  const board = state.boards[playerId] || createEmptyBoard();
+
+  // Collect all cards from board
+  const boardCards: GameCard[] = [...board.bank];
+  for (const color of Object.keys(board.properties) as PropertyColor[]) {
+    boardCards.push(...board.properties[color]);
+  }
+
+  // Merge hand + board cards back into deck and shuffle
+  const returnedCards = [...playerHand, ...boardCards];
+  const newDeck = shuffleDeck([...state.deck, ...returnedCards]);
+
+  // Remove from player order
+  const newPlayerOrder = state.playerOrder.filter(id => id !== playerId);
+
+  // Adjust currentPlayerIndex
+  const oldIndex = state.currentPlayerIndex;
+  const removedIndex = state.playerOrder.indexOf(playerId);
+  let newIndex = oldIndex;
+  if (removedIndex < oldIndex) {
+    newIndex = oldIndex - 1;
+  } else if (removedIndex === oldIndex) {
+    newIndex = oldIndex >= newPlayerOrder.length ? 0 : oldIndex;
+  }
+  if (newPlayerOrder.length > 0) {
+    newIndex = newIndex % newPlayerOrder.length;
+  }
+
+  // Remove board
+  const newBoards = { ...state.boards };
+  delete newBoards[playerId];
+
+  const newHandCounts = { ...state.handCounts };
+  delete newHandCounts[playerId];
+
+  // Check if only 1 player left
+  const winner = newPlayerOrder.length === 1 ? newPlayerOrder[0] : null;
+
+  return {
+    ...state,
+    deck: newDeck,
+    boards: newBoards,
+    playerOrder: newPlayerOrder,
+    currentPlayerIndex: newIndex,
+    handCounts: newHandCounts,
+    winner,
+    phase: winner ? 'finished' : (removedIndex === oldIndex ? 'drawing' : state.phase),
+    pendingAction: null,
+  };
+}

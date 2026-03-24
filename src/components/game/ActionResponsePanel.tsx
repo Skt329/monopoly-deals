@@ -81,12 +81,46 @@ export function ActionResponsePanel({
           ⚡ Action Against You!
         </h2>
         <p className="text-sm text-muted-foreground mb-4">
-          {pending.type === 'rent' && `${sourceName} is charging rent! You owe M${amountOwed}.`}
+          {pending.type === 'rent' && `${sourceName} is charging rent on ${pending.targetColor || 'properties'}! You owe M${amountOwed}.${pending.doubleRent ? ' (DOUBLED!)' : ''}`}
           {pending.type === 'birthday' && `It's ${sourceName}'s birthday! Pay M${amountOwed}.`}
           {pending.type === 'debt_collector' && `${sourceName} is collecting debt! Pay M${amountOwed}.`}
-          {pending.type === 'deal_breaker' && `${sourceName} wants to steal a complete set from you!`}
-          {pending.type === 'sly_deal' && `${sourceName} wants to steal one of your properties!`}
-          {pending.type === 'forced_deal' && `${sourceName} wants to swap a property with you!`}
+          {pending.type === 'deal_breaker' && (() => {
+            const color = pending.targetColor;
+            return `${sourceName} wants to steal your complete ${color ? color.toUpperCase() : ''} set!`;
+          })()}
+          {pending.type === 'sly_deal' && (() => {
+            const targetUid = pending.targetCardUid;
+            let cardName = 'a property';
+            if (targetUid) {
+              for (const color of Object.keys(myBoard.properties) as PropertyColor[]) {
+                const found = myBoard.properties[color]?.find(c => c.uid === targetUid);
+                if (found) { cardName = found.name; break; }
+              }
+            }
+            return `${sourceName} wants to steal your "${cardName}"!`;
+          })()}
+          {pending.type === 'forced_deal' && (() => {
+            const targetUid = pending.targetCardUid;
+            const sourceUid = pending.sourceCardUid;
+            let targetName = 'a property';
+            let sourceName2 = 'a property';
+            if (targetUid) {
+              for (const color of Object.keys(myBoard.properties) as PropertyColor[]) {
+                const found = myBoard.properties[color]?.find(c => c.uid === targetUid);
+                if (found) { targetName = found.name; break; }
+              }
+            }
+            if (sourceUid) {
+              const attackerBoard = gameState.boards[pending.sourcePlayerId];
+              if (attackerBoard) {
+                for (const color of Object.keys(attackerBoard.properties) as PropertyColor[]) {
+                  const found = attackerBoard.properties[color]?.find(c => c.uid === sourceUid);
+                  if (found) { sourceName2 = found.name; break; }
+                }
+              }
+            }
+            return `${sourceName} wants to swap their "${sourceName2}" for your "${targetName}"!`;
+          })()}
         </p>
 
         {/* Payment selection for payment actions */}
