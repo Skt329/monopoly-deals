@@ -1027,9 +1027,9 @@ export default function Game() {
       {/* Center area - more space */}
       <div className="flex-1 flex flex-col md:flex-row gap-2 md:gap-4 px-2 md:px-3 py-1.5 md:py-2 overflow-auto min-h-0">
         {/* My properties */}
-        <div className="flex-1 flex flex-col gap-1.5 overflow-y-auto min-w-0">
-          <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Your Properties</h3>
-          <div className="flex flex-wrap gap-1.5">
+        <div className="flex-1 flex flex-col gap-1 md:gap-1.5 overflow-y-auto min-w-0">
+          <h3 className="text-[9px] md:text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Your Properties</h3>
+          <div className="flex flex-wrap gap-1 md:gap-1.5">
             {(Object.keys(myBoard.properties) as PropertyColor[]).map(color => {
               const props = myBoard.properties[color] || [];
               if (props.length === 0) return null;
