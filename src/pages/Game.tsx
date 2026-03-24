@@ -337,7 +337,7 @@ export default function Game() {
     setSelectedCard(null);
     setShowColorPicker(false);
     await persistState(result.state, result.hand);
-    broadcastMove(`played ${card?.name || 'property'} as ${COLOR_CONFIG[color].label} property`);
+    broadcastMove(`played ${card?.name || 'property'} as ${COLOR_CONFIG[color].label} property`, card || undefined);
 
     if (result.state.winner) {
       toast.success('🎉 You completed 3 sets! YOU WIN!', { duration: 10000 });
