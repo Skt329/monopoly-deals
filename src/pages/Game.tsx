@@ -1049,11 +1049,11 @@ export default function Game() {
                   <Badge variant="destructive" className="text-[9px] animate-pulse">Select a Rent card!</Badge>
                 )}
               </div>
-              <div className="flex gap-1.5 overflow-x-auto pb-1 justify-center">
+              <div ref={handRef} className="flex gap-1.5 overflow-x-auto pb-1 justify-center">
                 {myHand.map((card, i) => (
                   <div
                     key={card.uid}
-                    className="flex-none transition-transform hover:-translate-y-1 hover:scale-105"
+                    className="flex-none transition-transform hover:-translate-y-1 hover:scale-105 animate-card-deal-bounce"
                     style={{ animationDelay: `${i * 30}ms` }}
                   >
                     <GameCardComponent
