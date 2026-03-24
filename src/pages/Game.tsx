@@ -444,10 +444,16 @@ export default function Game() {
           <Badge variant={isMyTurn ? 'default' : 'secondary'} className={isMyTurn ? 'animate-pulse' : ''}>
             {isMyTurn ? "⭐ Your Turn" : `${currentPlayerName}'s Turn`}
           </Badge>
-          {isMyTurn && (
-            <Badge variant="outline">
-              Plays: {gameState.cardsPlayedThisTurn}/3
-            </Badge>
+          {isMyTurn && gameState.phase === 'playing' && (
+            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full font-bold text-sm border-2 ${
+              gameState.cardsPlayedThisTurn >= 3
+                ? 'bg-destructive/10 border-destructive text-destructive'
+                : gameState.cardsPlayedThisTurn >= 2
+                  ? 'bg-amber-100 border-amber-400 text-amber-700'
+                  : 'bg-primary/10 border-primary text-primary'
+            }`}>
+              🎴 {gameState.cardsPlayedThisTurn} / 3
+            </div>
           )}
           {gameState.phase === 'responding' && (
             <Badge variant="destructive" className="animate-pulse">
