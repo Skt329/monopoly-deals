@@ -628,6 +628,17 @@ export default function Game() {
     toast.info('Action accepted — properties transferred');
   }, [gameState, userId, myHand, persistState]);
 
+  // Exit game handler
+  const handleExitGame = useCallback(async () => {
+    if (!gameState || !roomId) return;
+    const newState = removePlayer(gameState, userId, myHand);
+    broadcastMove('left the game');
+    // Persist the new state for remaining players
+    await supabase.from('game_states').update({ current_state: newState as unknown as import('@/integrations/supabase/types').Json }).eq('room_id', roomId);
+    toast.info('You left the game');
+    navigate('/');
+  }, [gameState, userId, myHand, roomId, navigate, broadcastMove]);
+
   const handleEndTurn = useCallback(async () => {
     if (!gameState || !isMyTurn) return;
     if (needsDiscard(myHand) && gameState.cardsPlayedThisTurn < 3) {
