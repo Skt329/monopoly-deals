@@ -330,13 +330,15 @@ export default function Game() {
 
   const handlePlayAsMoney = useCallback(async () => {
     if (!gameState || !selectedCard) return;
+    const card = myHand.find(c => c.uid === selectedCard);
     const result = playCardAsMoney(gameState, myHand, selectedCard);
     if (!result) { toast.error('Cannot play this card'); return; }
     setSelectedCard(null);
     await persistState(result.state, result.hand);
+    broadcastMove(`added M${card?.value || 0} to bank`);
     toast.success('Added to bank!');
     await checkAutoEndTurn(result.state, result.hand);
-  }, [gameState, selectedCard, myHand, persistState, checkAutoEndTurn]);
+  }, [gameState, selectedCard, myHand, persistState, checkAutoEndTurn, broadcastMove]);
 
   const triggerCelebration = useCallback((type: string, message: string, emoji: string) => {
     setCelebration({ type, message, emoji });
