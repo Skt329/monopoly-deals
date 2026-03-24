@@ -1295,7 +1295,7 @@ export default function Game() {
 
       {/* My hand */}
       {!discardMode && (
-        <div ref={handRef} className="flex-none border-t bg-card/90 backdrop-blur-sm px-2 md:px-3 py-1.5 md:py-2 shadow-inner max-h-[25vh] md:max-h-[35vh] overflow-y-auto">
+        <div ref={handRef} className="flex-none border-t bg-card/90 backdrop-blur-sm px-2 md:px-3 py-1.5 md:py-2 shadow-inner max-h-[30vh] md:max-h-[40vh] overflow-y-auto">
           <div className="flex items-center gap-1.5 md:gap-2 mb-1">
             <Hand className="w-3 h-3 text-muted-foreground" />
             <span className="text-[9px] md:text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
