@@ -124,6 +124,12 @@
   100% { transform: translateY(0) scale(1); opacity: 1; }
 }
 
+@keyframes flyToHand {
+  0% { transform: translate(0, 0) scale(0.6) rotate(-15deg); opacity: 0.8; }
+  50% { transform: translate(var(--fly-x, 100px), var(--fly-y, 200px)) scale(1.1) rotate(5deg); opacity: 1; }
+  100% { transform: translate(var(--fly-x, 100px), var(--fly-y, 200px)) scale(1) rotate(0deg); opacity: 1; }
+}
+
 @keyframes coin-collect {
   0% { transform: scale(0) rotate(0deg); opacity: 0; }
   50% { transform: scale(1.2) rotate(180deg); opacity: 1; }
@@ -142,11 +148,46 @@
   100% { transform: scale(1); opacity: 0.8; }
 }
 
+@keyframes celebration-enter {
+  0% { transform: scale(0.3) rotate(-10deg); opacity: 0; }
+  60% { transform: scale(1.1) rotate(2deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes celebration-exit {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.5) translateY(-30px); opacity: 0; }
+}
+
+@keyframes log-slide {
+  0% { transform: translateX(20px); opacity: 0; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+
 .animate-card-play { animation: card-play 0.5s ease-out forwards; }
 .animate-card-draw { animation: card-draw 0.4s ease-out; }
+.animate-fly-to-hand { animation: flyToHand 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
 .animate-coin-collect { animation: coin-collect 0.6s ease-out; }
 .animate-set-complete { animation: set-complete 1s ease-out; }
 .animate-shield-block { animation: shield-block 0.4s ease-out; }
+.animate-celebration-enter { animation: celebration-enter 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+.animate-log-slide { animation: log-slide 0.3s ease-out; }
+
+/* Game table felt background */
+.game-felt {
+  background: linear-gradient(135deg, hsl(152 40% 22%) 0%, hsl(152 45% 28%) 50%, hsl(152 35% 25%) 100%);
+  background-size: 200px 200px;
+}
+
+/* Card fan in hand */
+.card-fan > *:not(:first-child) {
+  margin-left: -8px;
+}
+
+.card-fan > *:hover {
+  z-index: 10;
+  transform: translateY(-8px) scale(1.05);
+}
 
 @keyframes shrink {
   from { width: 100%; }

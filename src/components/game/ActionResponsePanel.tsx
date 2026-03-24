@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { type GameCard, type PropertyColor } from '@/data/cards';
+import { type GameCard, type PropertyColor, COLOR_CONFIG } from '@/data/cards';
 import { type PublicGameState, type PlayerBoard } from '@/lib/gameEngine';
 import { GameCardComponent } from './cards/GameCardComponent';
 import { Shield, CreditCard, X } from 'lucide-react';
@@ -81,12 +81,40 @@ export function ActionResponsePanel({
           ⚡ Action Against You!
         </h2>
         <p className="text-sm text-muted-foreground mb-4">
-          {pending.type === 'rent' && `${sourceName} is charging rent! You owe M${amountOwed}.`}
-          {pending.type === 'birthday' && `It's ${sourceName}'s birthday! Pay M${amountOwed}.`}
-          {pending.type === 'debt_collector' && `${sourceName} is collecting debt! Pay M${amountOwed}.`}
-          {pending.type === 'deal_breaker' && `${sourceName} wants to steal a complete set from you!`}
-          {pending.type === 'sly_deal' && `${sourceName} wants to steal one of your properties!`}
-          {pending.type === 'forced_deal' && `${sourceName} wants to swap a property with you!`}
+          {pending.type === 'rent' && `${sourceName} is charging M${amountOwed} rent on ${pending.targetColor ? COLOR_CONFIG[pending.targetColor].label : 'properties'}!${pending.doubleRent ? ' (DOUBLED! 🔥)' : ''}`}
+          {pending.type === 'birthday' && `It's ${sourceName}'s birthday! 🎂 Pay M${amountOwed}.`}
+          {pending.type === 'debt_collector' && `${sourceName} is collecting M${amountOwed} debt from you! 🏦`}
+          {pending.type === 'deal_breaker' && `${sourceName} wants to steal your complete ${pending.targetColor ? COLOR_CONFIG[pending.targetColor].label : ''} set! 💥`}
+          {pending.type === 'sly_deal' && (() => {
+            // Find the target card name
+            if (pending.targetCardUid) {
+              for (const color of Object.keys(myBoard.properties) as PropertyColor[]) {
+                const card = myBoard.properties[color].find(c => c.uid === pending.targetCardUid);
+                if (card) return `${sourceName} wants to steal your ${card.name}! 🕵️`;
+              }
+            }
+            return `${sourceName} wants to steal one of your properties! 🕵️`;
+          })()}
+          {pending.type === 'forced_deal' && (() => {
+            let targetCardName = 'a property';
+            if (pending.targetCardUid) {
+              for (const color of Object.keys(myBoard.properties) as PropertyColor[]) {
+                const card = myBoard.properties[color].find(c => c.uid === pending.targetCardUid);
+                if (card) { targetCardName = card.name; break; }
+              }
+            }
+            let sourceCardName = 'one of their properties';
+            if (pending.sourceCardUid) {
+              const attackerBoard = gameState.boards[pending.sourcePlayerId];
+              if (attackerBoard) {
+                for (const color of Object.keys(attackerBoard.properties) as PropertyColor[]) {
+                  const card = attackerBoard.properties[color].find(c => c.uid === pending.sourceCardUid);
+                  if (card) { sourceCardName = card.name; break; }
+                }
+              }
+            }
+            return `${sourceName} wants to swap their ${sourceCardName} for your ${targetCardName}! 🔄`;
+          })()}
         </p>
 
         {/* Payment selection for payment actions */}
