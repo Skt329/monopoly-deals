@@ -26,15 +26,21 @@ interface GameChatProps {
   userId: string;
   playerName: string;
   players: { user_id: string; display_name: string }[];
+  variant?: 'floating' | 'topbar';
+  isOpen?: boolean;
+  onToggle?: () => void;
 }
 
-export function GameChat({ roomId, userId, playerName, players }: GameChatProps) {
+export function GameChat({ roomId, userId, playerName, players, variant = 'floating', isOpen: controlledOpen, onToggle }: GameChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isOpen, setIsOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [input, setInput] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const toggleOpen = onToggle || (() => setInternalOpen(prev => !prev));
 
   useEffect(() => {
     if (!roomId) return;
@@ -71,7 +77,6 @@ export function GameChat({ roomId, userId, playerName, players }: GameChatProps)
       event: 'chat',
       payload: { playerId: userId, playerName, text: trimmed },
     });
-    // Add locally immediately
     setMessages(prev => [...prev.slice(-99), {
       id: `${Date.now()}-local`,
       playerId: userId,
@@ -87,13 +92,31 @@ export function GameChat({ roomId, userId, playerName, players }: GameChatProps)
     return PLAYER_COLORS[idx % PLAYER_COLORS.length];
   };
 
-  if (!isOpen) {
+  // Top bar trigger button (for use in the top bar)
+  if (variant === 'topbar' && !isOpen) {
     return (
       <button
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-20 right-3 md:bottom-4 md:right-4 z-50 bg-primary text-primary-foreground rounded-full w-10 h-10 md:w-12 md:h-12 flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
+        onClick={toggleOpen}
+        className="relative flex items-center justify-center w-7 h-7 md:w-8 md:h-8 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors"
       >
-        <MessageCircle className="w-5 h-5 md:w-6 md:h-6" />
+        <MessageCircle className="w-4 h-4 text-primary" />
+        {unreadCount > 0 && (
+          <Badge className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-[8px] px-1 py-0 min-w-[16px] h-[16px] flex items-center justify-center">
+            {unreadCount}
+          </Badge>
+        )}
+      </button>
+    );
+  }
+
+  // Floating trigger button (mobile)
+  if (variant === 'floating' && !isOpen) {
+    return (
+      <button
+        onClick={toggleOpen}
+        className="fixed bottom-20 right-3 z-50 bg-primary text-primary-foreground rounded-full w-10 h-10 flex items-center justify-center shadow-lg hover:scale-110 transition-transform md:hidden"
+      >
+        <MessageCircle className="w-5 h-5" />
         {unreadCount > 0 && (
           <Badge className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-[9px] px-1.5 py-0 min-w-[18px] h-[18px] flex items-center justify-center">
             {unreadCount}
@@ -103,12 +126,13 @@ export function GameChat({ roomId, userId, playerName, players }: GameChatProps)
     );
   }
 
-  return (
-    <div className="fixed bottom-0 right-0 md:bottom-4 md:right-4 z-50 w-full md:w-80 h-[50vh] md:h-96 bg-card border-t md:border md:rounded-xl shadow-2xl flex flex-col">
+  // Chat panel content (shared between variants)
+  const chatContent = (
+    <>
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/50 md:rounded-t-xl">
-        <span className="font-bold text-sm text-foreground">💬 Game Chat</span>
-        <button onClick={() => setIsOpen(false)} className="text-muted-foreground hover:text-foreground">
+      <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/50">
+        <span className="font-bold text-sm text-foreground">💬 Chat</span>
+        <button onClick={toggleOpen} className="text-muted-foreground hover:text-foreground">
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -116,14 +140,14 @@ export function GameChat({ roomId, userId, playerName, players }: GameChatProps)
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1.5 min-h-0">
         {messages.length === 0 && (
-          <p className="text-xs text-muted-foreground text-center mt-8">No messages yet. Say hi! 👋</p>
+          <p className="text-xs text-muted-foreground text-center mt-8">No messages yet 👋</p>
         )}
         {messages.map(msg => (
           <div key={msg.id} className={`flex flex-col ${msg.playerId === userId ? 'items-end' : 'items-start'}`}>
             <span className={`text-[10px] font-bold ${getPlayerColor(msg.playerId)}`}>
               {msg.playerId === userId ? 'You' : msg.playerName}
             </span>
-            <div className={`rounded-lg px-2.5 py-1 max-w-[80%] text-xs ${
+            <div className={`rounded-lg px-2.5 py-1 max-w-[85%] text-xs ${
               msg.playerId === userId
                 ? 'bg-primary text-primary-foreground'
                 : 'bg-muted text-foreground'
@@ -148,6 +172,22 @@ export function GameChat({ roomId, userId, playerName, players }: GameChatProps)
           <Send className="w-3.5 h-3.5" />
         </Button>
       </div>
+    </>
+  );
+
+  // Desktop sidebar variant
+  if (variant === 'topbar') {
+    return (
+      <div className="hidden md:flex flex-col w-72 border-l bg-card shadow-lg h-full">
+        {chatContent}
+      </div>
+    );
+  }
+
+  // Mobile floating bottom sheet
+  return (
+    <div className="fixed bottom-0 right-0 z-50 w-full h-[50vh] bg-card border-t shadow-2xl flex flex-col md:hidden">
+      {chatContent}
     </div>
   );
 }
