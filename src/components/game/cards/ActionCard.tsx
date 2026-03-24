@@ -5,7 +5,6 @@ interface ActionCardProps {
   card: GameCard;
   onClick?: () => void;
   selected?: boolean;
-  small?: boolean;
 }
 
 const ACTION_STYLES: Record<string, { bg: string; light: string; emoji: string }> = {
@@ -21,7 +20,7 @@ const ACTION_STYLES: Record<string, { bg: string; light: string; emoji: string }
   'Double The Rent':  { bg: '#F5F0E8', light: '#FFFFFF', emoji: '💸' },
 };
 
-export function ActionCard({ card, onClick, selected, small }: ActionCardProps) {
+export function ActionCard({ card, onClick, selected }: ActionCardProps) {
   const style = ACTION_STYLES[card.name] || { bg: '#9E9E9E', light: '#BDBDBD', emoji: '⚡' };
   const isDark = ['Deal Breaker', "It's Your Birthday", 'Just Say No'].includes(card.name);
   const textColor = isDark ? '#FFF' : '#333';
@@ -30,52 +29,45 @@ export function ActionCard({ card, onClick, selected, small }: ActionCardProps) 
     <div
       onClick={onClick}
       className={cn(
-        'relative rounded-xl shadow-lg cursor-pointer transition-all duration-200 select-none overflow-hidden flex flex-col',
-        small ? 'w-20 h-28' : 'w-36 h-52',
+        'relative rounded-xl shadow-lg cursor-pointer transition-all duration-200 select-none overflow-hidden flex flex-col w-36 h-52',
         selected && 'ring-2 ring-primary scale-105 -translate-y-2',
         onClick && 'hover:scale-105 hover:-translate-y-1'
       )}
       style={{ backgroundColor: style.bg, border: `2px solid ${style.bg}` }}
     >
       {/* Top row: value circle + ACTION banner */}
-      <div className={cn('flex items-start justify-between', small ? 'p-0.5' : 'p-1.5')}>
-        <div className={cn(
-          'rounded-full font-black flex items-center justify-center bg-white',
-          small ? 'w-5 h-5 text-[7px]' : 'w-8 h-8 text-xs'
-        )} style={{ border: '2px solid #333', color: '#333' }}>
+      <div className="flex items-start justify-between p-1.5">
+        <div className="w-8 h-8 text-xs rounded-full font-black flex items-center justify-center bg-white"
+          style={{ border: '2px solid #333', color: '#333' }}>
           <span className="text-[5px] align-top">M</span>{card.value}
         </div>
-        <div className={cn(
-          'font-black italic text-white px-2 py-0.5',
-          small ? 'text-[6px]' : 'text-sm'
-        )} style={{ backgroundColor: '#333', clipPath: 'polygon(10% 0, 100% 0, 100% 100%, 0% 100%)' }}>
+        <div className="font-black italic text-white px-2 py-0.5 text-sm"
+          style={{ backgroundColor: '#333', clipPath: 'polygon(10% 0, 100% 0, 100% 100%, 0% 100%)' }}>
           ACTION
         </div>
       </div>
 
       {/* Inner bordered area with circle */}
-      <div className={cn('flex-1 flex flex-col items-center', small ? 'mx-1 mb-1' : 'mx-2 mb-2')}
-        style={{ border: `2px solid #333` }}>
+      <div className="flex-1 flex flex-col items-center mx-2 mb-1"
+        style={{ border: '2px solid #333' }}>
         
         {/* Large circle with action name */}
-        <div className={cn(
-          'rounded-full flex flex-col items-center justify-center',
-          small ? 'w-12 h-12 mt-1' : 'w-20 h-20 mt-2'
-        )} style={{ border: '3px solid #333', backgroundColor: style.light }}>
-          {!small && <span className="text-lg">{style.emoji}</span>}
-          <span className={cn('font-black text-center uppercase leading-none', small ? 'text-[5px] px-0.5' : 'text-[9px] px-1')}
+        <div className="rounded-full flex flex-col items-center justify-center w-20 h-20 mt-2"
+          style={{ border: '3px solid #333', backgroundColor: style.light }}>
+          <span className="text-lg">{style.emoji}</span>
+          <span className="font-black text-center uppercase leading-none text-[9px] px-1"
             style={{ color: '#333' }}>
             {card.name}
           </span>
         </div>
-
-        {/* Description text */}
-        {!small && card.description && (
-          <p className="text-[8px] text-center px-2 mt-2 leading-tight font-medium" style={{ color: textColor }}>
-            {card.description}
-          </p>
-        )}
       </div>
+
+      {/* Description text below bordered area */}
+      {card.description && (
+        <p className="text-[8px] text-center px-2 pb-1.5 leading-tight font-medium" style={{ color: textColor }}>
+          {card.description}
+        </p>
+      )}
     </div>
   );
 }
