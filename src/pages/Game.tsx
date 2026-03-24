@@ -9,6 +9,7 @@ import {
   type PropertyColor,
   COLOR_CONFIG,
   PROPERTY_SETS,
+  MAX_HAND_SIZE,
 } from '@/data/cards';
 import {
   type PublicGameState,
@@ -20,6 +21,7 @@ import {
   playActionCard,
   endTurn,
   needsDiscard,
+  discardCards,
   countCompleteSets,
   getBankTotal,
   createEmptyBoard,
@@ -53,6 +55,8 @@ export default function Game() {
   const [targetAction, setTargetAction] = useState<string>('');
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<PropertyColor | null>(null);
+  const [discardMode, setDiscardMode] = useState(false);
+  const [discardSelected, setDiscardSelected] = useState<string[]>([]);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   // Initialize
@@ -322,13 +326,29 @@ export default function Game() {
   const handleEndTurn = useCallback(async () => {
     if (!gameState || !isMyTurn) return;
     if (needsDiscard(myHand)) {
-      toast.error(`Discard down to 7 cards (you have ${myHand.length})`);
+      setDiscardMode(true);
+      setDiscardSelected([]);
       return;
     }
     const newState = endTurn(gameState);
     await persistState(newState, myHand);
     toast.info('Turn ended');
   }, [gameState, isMyTurn, myHand, persistState]);
+
+  const handleDiscardToggle = (uid: string) => {
+    setDiscardSelected(prev =>
+      prev.includes(uid) ? prev.filter(id => id !== uid) : [...prev, uid]
+    );
+  };
+
+  const handleConfirmDiscard = useCallback(async () => {
+    if (!gameState) return;
+    const result = discardCards(gameState, myHand, discardSelected);
+    setDiscardMode(false);
+    setDiscardSelected([]);
+    await persistState(result.state, result.hand);
+    toast.info('Cards discarded, turn ended');
+  }, [gameState, myHand, discardSelected, persistState]);
 
   const handleCardClick = (uid: string) => {
     if (!isMyTurn || gameState?.phase !== 'playing') return;
@@ -424,10 +444,16 @@ export default function Game() {
           <Badge variant={isMyTurn ? 'default' : 'secondary'} className={isMyTurn ? 'animate-pulse' : ''}>
             {isMyTurn ? "⭐ Your Turn" : `${currentPlayerName}'s Turn`}
           </Badge>
-          {isMyTurn && (
-            <Badge variant="outline">
-              Plays: {gameState.cardsPlayedThisTurn}/3
-            </Badge>
+          {isMyTurn && gameState.phase === 'playing' && (
+            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full font-bold text-sm border-2 ${
+              gameState.cardsPlayedThisTurn >= 3
+                ? 'bg-destructive/10 border-destructive text-destructive'
+                : gameState.cardsPlayedThisTurn >= 2
+                  ? 'bg-amber-100 border-amber-400 text-amber-700'
+                  : 'bg-primary/10 border-primary text-primary'
+            }`}>
+              🎴 {gameState.cardsPlayedThisTurn} / 3
+            </div>
           )}
           {gameState.phase === 'responding' && (
             <Badge variant="destructive" className="animate-pulse">
@@ -570,9 +596,18 @@ export default function Game() {
             <p className="text-xs text-muted-foreground">/ 3 Sets</p>
           </div>
           {isMyTurn && gameState.phase === 'playing' && (
-            <Button onClick={handleEndTurn} variant="secondary" className="gap-1 text-sm">
-              End Turn <ChevronRight className="w-3 h-3" />
-            </Button>
+            <div className="flex flex-col items-center gap-1">
+              <Button
+                onClick={handleEndTurn}
+                variant={gameState.cardsPlayedThisTurn >= 3 ? 'default' : 'secondary'}
+                className={`gap-1 text-sm ${gameState.cardsPlayedThisTurn >= 3 ? 'animate-pulse' : ''}`}
+              >
+                End Turn <ChevronRight className="w-3 h-3" />
+              </Button>
+              {gameState.cardsPlayedThisTurn >= 3 && (
+                <span className="text-[10px] text-destructive font-semibold">No more plays!</span>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -620,26 +655,61 @@ export default function Game() {
         </div>
       )}
 
+      {/* Discard overlay */}
+      {discardMode && (
+        <div className="flex-none px-4 py-3 border-t bg-destructive/5 border-destructive/30">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-bold text-destructive">
+              ⚠️ Discard {myHand.length - MAX_HAND_SIZE} card{myHand.length - MAX_HAND_SIZE > 1 ? 's' : ''} (you have {myHand.length}, max {MAX_HAND_SIZE})
+            </span>
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={discardSelected.length < myHand.length - MAX_HAND_SIZE}
+              onClick={handleConfirmDiscard}
+            >
+              Confirm Discard ({discardSelected.length}/{myHand.length - MAX_HAND_SIZE})
+            </Button>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-2 justify-center">
+            {myHand.map((card) => (
+              <div
+                key={card.uid}
+                className="flex-none cursor-pointer"
+                onClick={() => handleDiscardToggle(card.uid)}
+              >
+                <GameCardComponent
+                  card={card}
+                  selected={discardSelected.includes(card.uid)}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* My hand */}
-      <div className="flex-none border-t bg-card/90 backdrop-blur-sm px-4 py-3 shadow-inner">
-        <div className="flex items-center gap-2 mb-2">
-          <Hand className="w-4 h-4 text-muted-foreground" />
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Your Hand ({myHand.length})
-          </span>
+      {!discardMode && (
+        <div className="flex-none border-t bg-card/90 backdrop-blur-sm px-4 py-3 shadow-inner">
+          <div className="flex items-center gap-2 mb-2">
+            <Hand className="w-4 h-4 text-muted-foreground" />
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Your Hand ({myHand.length})
+            </span>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-2 justify-center">
+            {myHand.map((card, i) => (
+              <div key={card.uid} className="flex-none" style={{ animationDelay: `${i * 50}ms` }}>
+                <GameCardComponent
+                  card={card}
+                  onClick={() => handleCardClick(card.uid)}
+                  selected={selectedCard === card.uid}
+                />
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-2 justify-center">
-          {myHand.map((card, i) => (
-            <div key={card.uid} className="flex-none" style={{ animationDelay: `${i * 50}ms` }}>
-              <GameCardComponent
-                card={card}
-                onClick={() => handleCardClick(card.uid)}
-                selected={selectedCard === card.uid}
-              />
-            </div>
-          ))}
-        </div>
-      </div>
+      )}
     </div>
   );
 }
