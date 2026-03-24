@@ -197,6 +197,22 @@ export default function Game() {
     toast.success(`Drew ${result.drawnCards.length} cards`);
   }, [gameState, isMyTurn, myHand, persistState]);
 
+  // Check if turn should auto-end or discard after a play
+  const checkAutoEndTurn = useCallback(async (newState: PublicGameState, newHand: GameCard[]) => {
+    if (newState.cardsPlayedThisTurn >= 3 && !newState.winner) {
+      if (newHand.length > MAX_HAND_SIZE) {
+        setDiscardMode(true);
+        setDiscardSelected([]);
+        toast.info(`You've used all 3 plays. Discard down to ${MAX_HAND_SIZE} cards.`);
+      } else {
+        const endedState = endTurn(newState);
+        setGameState(endedState);
+        await supabase.from('game_states').update({ current_state: endedState as unknown as import('@/integrations/supabase/types').Json }).eq('room_id', roomId);
+        toast.info('All 3 plays used — turn ended automatically');
+      }
+    }
+  }, [roomId]);
+
   const handlePlayAsProperty = useCallback(async (color: PropertyColor) => {
     if (!gameState || !selectedCard) return;
     const result = playCardAsProperty(gameState, myHand, selectedCard, color);
@@ -209,8 +225,9 @@ export default function Game() {
       toast.success('🎉 You completed 3 sets! YOU WIN!', { duration: 10000 });
     } else {
       toast.success('Property played!');
+      await checkAutoEndTurn(result.state, result.hand);
     }
-  }, [gameState, selectedCard, myHand, persistState]);
+  }, [gameState, selectedCard, myHand, persistState, checkAutoEndTurn]);
 
   const handlePlayAsMoney = useCallback(async () => {
     if (!gameState || !selectedCard) return;
@@ -219,10 +236,11 @@ export default function Game() {
     setSelectedCard(null);
     await persistState(result.state, result.hand);
     toast.success('Added to bank!');
-  }, [gameState, selectedCard, myHand, persistState]);
+    await checkAutoEndTurn(result.state, result.hand);
+  }, [gameState, selectedCard, myHand, persistState, checkAutoEndTurn]);
 
   // Action card play - opens target selector if needed
-  const handlePlayAction = useCallback(() => {
+  const handlePlayAction = useCallback(async () => {
     if (!gameState || !selectedCard) return;
     const card = myHand.find(c => c.uid === selectedCard);
     if (!card) return;
@@ -265,17 +283,22 @@ export default function Game() {
       const result = playActionCard(gameState, myHand, selectedCard);
       if (!result) { toast.error('Cannot play this action'); return; }
       setSelectedCard(null);
-      persistState(result.state, result.hand);
+      await persistState(result.state, result.hand);
       toast.success(`${card.name} played!`);
+      // Birthday triggers responding phase, no auto-end needed
       return;
     }
 
     const result = playActionCard(gameState, myHand, selectedCard);
     if (!result) { toast.error('Cannot play this action'); return; }
     setSelectedCard(null);
-    persistState(result.state, result.hand);
+    await persistState(result.state, result.hand);
     toast.success(`${card.name} played!`);
-  }, [gameState, selectedCard, myHand, persistState]);
+    // For non-targeting actions like Pass Go, check auto-end
+    if (result.state.phase === 'playing') {
+      await checkAutoEndTurn(result.state, result.hand);
+    }
+  }, [gameState, selectedCard, myHand, persistState, checkAutoEndTurn]);
 
   // When Double Rent is pending and user selects a rent card
   const handlePlayRentWithDouble = useCallback(async () => {
@@ -732,12 +755,21 @@ export default function Game() {
         <div className="flex-none px-4 py-2 border-t bg-card flex items-center justify-center gap-3 shadow-lg">
           <span className="text-sm text-muted-foreground font-medium">{selectedCardData.name}</span>
 
-          {(selectedCardData.type === 'property') && (
+          {/* Money cards: only Play to Bank */}
+          {selectedCardData.type === 'money' && (
+            <Button size="sm" onClick={handlePlayAsMoney}>
+              Play to Bank (M{selectedCardData.value})
+            </Button>
+          )}
+
+          {/* Property cards: only Play as Property */}
+          {selectedCardData.type === 'property' && (
             <Button size="sm" onClick={() => handlePlayAsProperty(selectedCardData.color!)}>
               Play as Property
             </Button>
           )}
 
+          {/* Wild Property: Play as Property (with color picker) OR Play as Money */}
           {selectedCardData.type === 'wild_property' && (
             <>
               <Button size="sm" variant="outline" onClick={() => setShowColorPicker(!showColorPicker)}>
@@ -755,13 +787,34 @@ export default function Game() {
                   ))}
                 </div>
               )}
+              <Button size="sm" variant="secondary" onClick={handlePlayAsMoney}>
+                Play as Money (M{selectedCardData.value})
+              </Button>
             </>
           )}
 
-          {(selectedCardData.type === 'action' || selectedCardData.type === 'rent') && !doubleRentPending && (
-            <Button size="sm" onClick={handlePlayAction}>
-              Play Action
-            </Button>
+          {/* Action cards: Play Action OR Play as Money */}
+          {selectedCardData.type === 'action' && !doubleRentPending && (
+            <>
+              <Button size="sm" onClick={handlePlayAction}>
+                Play Action
+              </Button>
+              <Button size="sm" variant="secondary" onClick={handlePlayAsMoney}>
+                Play as Money (M{selectedCardData.value})
+              </Button>
+            </>
+          )}
+
+          {/* Rent cards: Play Action OR Play as Money (or Double Rent combo) */}
+          {selectedCardData.type === 'rent' && !doubleRentPending && (
+            <>
+              <Button size="sm" onClick={handlePlayAction}>
+                Play Rent
+              </Button>
+              <Button size="sm" variant="secondary" onClick={handlePlayAsMoney}>
+                Play as Money (M{selectedCardData.value})
+              </Button>
+            </>
           )}
 
           {/* When Double Rent is active and user picks a rent card */}
@@ -770,10 +823,6 @@ export default function Game() {
               🔥 Play with Double Rent!
             </Button>
           )}
-
-          <Button size="sm" variant="secondary" onClick={handlePlayAsMoney}>
-            Play as Money (M{selectedCardData.value})
-          </Button>
         </div>
       )}
 
