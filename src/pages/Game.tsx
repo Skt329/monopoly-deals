@@ -107,7 +107,7 @@ export default function Game() {
   const [expandedOpponent, setExpandedOpponent] = useState<string | null>(null);
   const [celebration, setCelebration] = useState<{ type: string; message: string; emoji: string } | null>(null);
   const [showLog, setShowLog] = useState(false);
-  const [flyingCards, setFlyingCards] = useState<{ id: string; delay: number; flyX: number; flyY: number }[]>([]);
+  const [flyingCards, setFlyingCards] = useState<{ id: string; delay: number }[]>([]);
   const deckRef = useRef<HTMLDivElement>(null);
 
   const getPlayerName = useCallback((pid: string) => {
@@ -230,26 +230,14 @@ export default function Game() {
   }, [userId, getPlayerName]);
 
   // Draw cards with flying animation
-  const handRef = useRef<HTMLDivElement>(null);
-
   const handleDraw = useCallback(async () => {
     if (!gameState || !isMyTurn || gameState.phase !== 'drawing') return;
     const result = drawCards(gameState, myHand);
 
-    // Calculate flight path from deck to hand area
-    const deckRect = deckRef.current?.getBoundingClientRect();
-    const handRect = handRef.current?.getBoundingClientRect();
-    const flyX = handRect && deckRect ? (handRect.left + handRect.width / 2) - deckRect.left : 200;
-    const flyY = handRect && deckRect ? (handRect.top - deckRect.top) : 300;
-
-    const cards = result.drawnCards.map((_, i) => ({
-      id: `fly-${Date.now()}-${i}`,
-      delay: i * 200,
-      flyX,
-      flyY,
-    }));
+    // Trigger flying card animation
+    const cards = result.drawnCards.map((_, i) => ({ id: `fly-${Date.now()}-${i}`, delay: i * 150 }));
     setFlyingCards(cards);
-    setTimeout(() => setFlyingCards([]), 1200);
+    setTimeout(() => setFlyingCards([]), 800);
 
     let stateWithLog = logAction(result.state, 'draw', `drew ${result.drawnCards.length} cards`);
     await persistState(stateWithLog, result.hand);
@@ -442,40 +430,16 @@ export default function Game() {
     setDoubleRentPending(false);
     setDoubleRentCardUid(null);
 
-    // Build detailed log message with specific card names
+    // Build detailed log message
     let detail = `played ${card.name}`;
     const targetName = selectedTarget ? getPlayerName(selectedTarget) : '';
-    if (card.name === 'Sly Deal' && targetName && selectedTargetCard) {
-      const tBoard = gameState.boards[selectedTarget!];
-      let cardName = 'a property';
-      if (tBoard) {
-        for (const c of Object.keys(tBoard.properties) as PropertyColor[]) {
-          const found = tBoard.properties[c].find(p => p.uid === selectedTargetCard);
-          if (found) { cardName = found.name; break; }
-        }
-      }
-      detail = `used Sly Deal to steal ${cardName} from ${targetName}`;
-    }
-    if (card.name === 'Forced Deal' && targetName && selectedTargetCard && selectedSourceCard) {
-      const tBoard = gameState.boards[selectedTarget!];
-      let targetCardName = 'a property', sourceCardName = 'a property';
-      if (tBoard) {
-        for (const c of Object.keys(tBoard.properties) as PropertyColor[]) {
-          const found = tBoard.properties[c].find(p => p.uid === selectedTargetCard);
-          if (found) { targetCardName = found.name; break; }
-        }
-      }
-      for (const c of Object.keys(myBoard.properties) as PropertyColor[]) {
-        const found = myBoard.properties[c].find(p => p.uid === selectedSourceCard);
-        if (found) { sourceCardName = found.name; break; }
-      }
-      detail = `used Forced Deal: swapped ${sourceCardName} for ${targetName}'s ${targetCardName}`;
-    }
+    if (card.name === 'Sly Deal' && targetName) detail = `used Sly Deal to steal a property from ${targetName}`;
+    if (card.name === 'Forced Deal' && targetName) detail = `used Forced Deal to swap properties with ${targetName}`;
     if (card.name === 'Deal Breaker' && targetName && selectedColor) detail = `used Deal Breaker to steal ${COLOR_CONFIG[selectedColor].label} set from ${targetName}`;
     if (card.name === 'Debt Collector' && targetName) detail = `charged M5 debt from ${targetName}`;
     if ((card.name === 'Rent' || card.name === 'Wild Rent') && selectedColor) {
-      const rentBoard = gameState.boards[userId];
-      const rentAmount = rentBoard ? calculateRent(rentBoard, selectedColor) * (doubleRentPending ? 2 : 1) : 0;
+      const myBoard = gameState.boards[userId];
+      const rentAmount = myBoard ? calculateRent(myBoard, selectedColor) * (doubleRentPending ? 2 : 1) : 0;
       detail = `charged M${rentAmount} rent on ${COLOR_CONFIG[selectedColor].label}${doubleRentPending ? ' (DOUBLED!)' : ''}`;
     }
     if (card.name === 'House' && selectedColor) detail = `added House to ${COLOR_CONFIG[selectedColor].label} set`;
@@ -682,24 +646,21 @@ export default function Game() {
       )}
 
       {/* ═══ Flying Cards Animation ═══ */}
-      {flyingCards.map(fc => {
-        const deckRect = deckRef.current?.getBoundingClientRect();
-        return (
-          <div
-            key={fc.id}
-            className="fixed z-50 pointer-events-none animate-fly-to-hand"
-            style={{
-              top: deckRect?.top ?? '40%',
-              left: deckRect?.left ?? '10%',
-              animationDelay: `${fc.delay}ms`,
-              '--fly-x': `${fc.flyX}px`,
-              '--fly-y': `${fc.flyY}px`,
-            } as React.CSSProperties}
-          >
-            <CardBack small />
-          </div>
-        );
-      })}
+      {flyingCards.map(fc => (
+        <div
+          key={fc.id}
+          className="fixed z-50 pointer-events-none animate-fly-to-hand"
+          style={{
+            top: deckRef.current?.getBoundingClientRect().top || '40%',
+            left: deckRef.current?.getBoundingClientRect().left || '50%',
+            animationDelay: `${fc.delay}ms`,
+            '--fly-x': '0px',
+            '--fly-y': '200px',
+          } as React.CSSProperties}
+        >
+          <CardBack />
+        </div>
+      ))}
 
       {/* ═══ Action Response Panel ═══ */}
       {gameState.phase === 'responding' && gameState.pendingAction && (
@@ -1049,11 +1010,11 @@ export default function Game() {
                   <Badge variant="destructive" className="text-[9px] animate-pulse">Select a Rent card!</Badge>
                 )}
               </div>
-              <div ref={handRef} className="flex gap-1.5 overflow-x-auto pb-1 justify-center">
+              <div className="flex gap-1.5 overflow-x-auto pb-1 justify-center">
                 {myHand.map((card, i) => (
                   <div
                     key={card.uid}
-                    className="flex-none transition-transform hover:-translate-y-1 hover:scale-105 animate-card-deal-bounce"
+                    className="flex-none transition-transform hover:-translate-y-1 hover:scale-105"
                     style={{ animationDelay: `${i * 30}ms` }}
                   >
                     <GameCardComponent
