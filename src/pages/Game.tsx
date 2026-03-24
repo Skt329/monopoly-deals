@@ -58,6 +58,7 @@ import { CardBack } from '@/components/game/cards/CardBack';
 import { ActionResponsePanel } from '@/components/game/ActionResponsePanel';
 import { TargetSelector } from '@/components/game/TargetSelector';
 import { DollarSign, Trophy, ChevronRight, ChevronDown, Layers, Hand, Sparkles, RefreshCw, LogOut } from 'lucide-react';
+import { GameChat } from '@/components/game/GameChat';
 
 interface FlyingCard {
   id: string;
