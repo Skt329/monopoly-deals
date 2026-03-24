@@ -241,12 +241,12 @@ export default function Game() {
     return () => { supabase.removeChannel(movesChannel); };
   }, [roomId, userId]);
 
-  const broadcastMove = useCallback((action: string) => {
+  const broadcastMove = useCallback((action: string, card?: GameCard) => {
     const name = getPlayerName(userId);
     movesChannelRef.current?.send({
       type: 'broadcast',
       event: 'move',
-      payload: { playerId: userId, playerName: name, action },
+      payload: { playerId: userId, playerName: name, action, card: card || null },
     });
   }, [userId, getPlayerName]);
 
