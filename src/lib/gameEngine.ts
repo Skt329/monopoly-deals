@@ -22,6 +22,14 @@ export interface PlayerBoard {
   hasHotel: Record<PropertyColor, boolean>;
 }
 
+export interface LogEntry {
+  playerId: string;
+  playerName: string;
+  action: string;
+  detail: string;
+  timestamp: number;
+}
+
 export interface PublicGameState {
   roomId: string;
   deck: GameCard[];
@@ -34,6 +42,7 @@ export interface PublicGameState {
   pendingAction: PendingAction | null;
   winner: string | null;
   handCounts: Record<string, number>;
+  gameLog: LogEntry[];
 }
 
 export type GamePhase =
