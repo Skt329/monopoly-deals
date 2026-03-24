@@ -230,14 +230,26 @@ export default function Game() {
   }, [userId, getPlayerName]);
 
   // Draw cards with flying animation
+  const handRef = useRef<HTMLDivElement>(null);
+
   const handleDraw = useCallback(async () => {
     if (!gameState || !isMyTurn || gameState.phase !== 'drawing') return;
     const result = drawCards(gameState, myHand);
 
-    // Trigger flying card animation
-    const cards = result.drawnCards.map((_, i) => ({ id: `fly-${Date.now()}-${i}`, delay: i * 150 }));
+    // Calculate flight path from deck to hand area
+    const deckRect = deckRef.current?.getBoundingClientRect();
+    const handRect = handRef.current?.getBoundingClientRect();
+    const flyX = handRect && deckRect ? (handRect.left + handRect.width / 2) - deckRect.left : 200;
+    const flyY = handRect && deckRect ? (handRect.top - deckRect.top) : 300;
+
+    const cards = result.drawnCards.map((_, i) => ({
+      id: `fly-${Date.now()}-${i}`,
+      delay: i * 200,
+      flyX,
+      flyY,
+    }));
     setFlyingCards(cards);
-    setTimeout(() => setFlyingCards([]), 800);
+    setTimeout(() => setFlyingCards([]), 1200);
 
     let stateWithLog = logAction(result.state, 'draw', `drew ${result.drawnCards.length} cards`);
     await persistState(stateWithLog, result.hand);
