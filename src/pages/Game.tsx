@@ -918,7 +918,7 @@ export default function Game() {
           return (
             <div
               key={player.user_id}
-              className={`flex-none rounded-lg border p-2 cursor-pointer transition-all ${isExpanded ? 'min-w-[320px] max-w-[400px]' : 'min-w-[200px] max-w-[260px]'} ${isCurrentTurn ? 'border-primary bg-primary/5' : 'border-border bg-card'}`}
+              className={`flex-none rounded-lg border p-1.5 md:p-2 cursor-pointer transition-all ${isExpanded ? 'min-w-[240px] md:min-w-[320px] max-w-[320px] md:max-w-[400px]' : 'min-w-[140px] md:min-w-[200px] max-w-[200px] md:max-w-[260px]'} ${isCurrentTurn ? 'border-primary bg-primary/5' : 'border-border bg-card'}`}
               onClick={() => setExpandedOpponent(isExpanded ? null : player.user_id)}
             >
               <div className="flex items-center justify-between mb-1">
