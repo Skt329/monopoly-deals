@@ -1,38 +1,52 @@
 
 
-# Fix: Card Play Options & Discard After 3 Plays
+# Fix: Card Preview, Just Say No, End Turn with Plays Left, and Payment Logic
 
-## Problems
+## 4 Issues
 
-1. **Wrong play options shown** — Line 774 always shows "Play as Money" for every card type, including money and property cards. A money card should only show "Play" (to bank). A property card should only show "Play as Property". Only action/rent/wild cards need multiple options.
+### 1. Card click should show enlarged popup
+Currently clicking a card in hand selects it for playing. Users need to read card details but cards are too small. Add a card preview dialog that shows an enlarged version when clicking, with action buttons inside the dialog.
 
-2. **Can't end turn with >7 cards after 3 plays** — When a player has used all 3 plays but has >7 cards (from Pass Go draws), `handleEndTurn` enters discard mode correctly. But the issue is: if `cardsPlayedThisTurn >= 3`, the player may not realize they need to click "End Turn" to trigger discard mode. The End Turn button exists but the flow is confusing — and there may be an edge case where the discard count check `discardSelected.length < myHand.length - MAX_HAND_SIZE` prevents confirming if the player selects too many or too few cards.
+### 2. Just Say No should only be playable as response or money
+Currently "Just Say No" shows "Play Action" + "Play as Money" in the action bar (line 797-805). The "Play Action" button should be removed — JSN can only be played reactively (via ActionResponsePanel) or banked as money.
 
-## Fix
+### 3. End Turn should not force discard if plays remain
+Currently `handleEndTurn` (line 450-460) checks `needsDiscard` and immediately enters discard mode. But if `cardsPlayedThisTurn < 3`, the player still has plays available and may want to use them to reduce hand size. Only force discard when all 3 plays are exhausted.
 
-### 1. Clean up action bar (lines 731-777)
+### 4. Payment: if total assets < debt, auto-pay everything; if more, let user choose
+Currently `ActionResponsePanel` disables the Pay button if `totalSelected < amountOwed` AND the player has assets (line 133). Per Monopoly Deal rules, if you can't afford the full amount, you pay everything you have. If you have more than enough, you choose what to pay.
 
-Change the logic so each card type shows only relevant buttons:
+---
 
-- **`type === 'money'`**: Show only "Play to Bank" button (no "Play as Property" option)
-- **`type === 'property'`**: Show only "Play as Property" button (no "Play as Money" option)  
-- **`type === 'wild_property'`**: Show "Play as Property" with color picker + "Play as Money"  (wild properties CAN be played as money per Monopoly Deal rules)
-- **`type === 'action'`**: Show "Play Action" + "Play as Money" (actions CAN be banked per rules)
-- **`type === 'rent'`**: Show "Play Action" + "Play as Money" (rents CAN be banked per rules)
+## Changes
 
-### 2. Auto-trigger discard when 3 plays used and hand > 7
+### `src/pages/Game.tsx`
 
-After playing the 3rd card, if hand > MAX_HAND_SIZE, automatically enter discard mode without requiring the player to click "End Turn" first. This prevents the stuck state.
+**Card preview dialog:**
+- Add `previewCard` state (`GameCard | null`)
+- On card click: if tapping same card that's already selected, open preview dialog. First tap selects, second tap previews. OR: single tap opens preview with action buttons inside.
+- Better UX: single click opens a Dialog with the enlarged card + action buttons. The dialog replaces the bottom action bar.
+- Import `Dialog` from ui components
 
-In the play handlers (`handlePlayAsMoney`, `handlePlayAsProperty`, `handlePlayAction`, etc.), after persisting state, check:
-- If `cardsPlayedThisTurn` just reached 3 AND new hand size > MAX_HAND_SIZE → set `discardMode = true`
-- If `cardsPlayedThisTurn` just reached 3 AND new hand size <= MAX_HAND_SIZE → auto end turn
+**Just Say No restriction:**
+- In the action bar section (line 797), add condition: if `selectedCardData.name === 'Just Say No'`, only show "Play as Money" button, not "Play Action"
 
-Also show a clearer message: "You've used all 3 plays. Discard down to 7 cards to end your turn."
+**End Turn with plays remaining:**
+- In `handleEndTurn` (line 450-460): if `myHand.length > MAX_HAND_SIZE` AND `cardsPlayedThisTurn < 3`, show a toast warning "You have plays remaining! Use them to reduce your hand, or discard." with a force-discard option
+- Add a separate "Force End Turn" flow: show a confirmation that says "You still have X plays left. End turn anyway?" — if confirmed AND hand > 7, then enter discard mode
 
-## Files to Edit
+**Payment logic in `ActionResponsePanel`:**
+- Calculate `totalAssets` (all bank + all property values)
+- If `totalAssets <= amountOwed`: show "Pay All (M{totalAssets})" button that auto-selects everything — no manual selection needed
+- If `totalAssets > amountOwed`: show current selection UI, require `totalSelected >= amountOwed`
 
-**`src/pages/Game.tsx`**:
-- Refactor action bar (lines 731-777): conditional buttons per card type
-- After each play action that increments `cardsPlayedThisTurn` to 3, auto-enter discard mode or auto-end turn
+### `src/components/game/ActionResponsePanel.tsx`
+
+- Add `totalAssets` calculation
+- If `totalAssets <= amountOwed`: render a single "Pay Everything" button that calls `onPay` with all bank card uids and all property cards
+- If `totalAssets > amountOwed`: keep current selection UI but enable pay button only when `totalSelected >= amountOwed`
+
+### Files
+- **Edit**: `src/pages/Game.tsx` — card preview dialog, JSN restriction, end turn logic
+- **Edit**: `src/components/game/ActionResponsePanel.tsx` — smart payment logic
 
