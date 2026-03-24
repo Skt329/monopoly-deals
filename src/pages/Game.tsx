@@ -326,13 +326,29 @@ export default function Game() {
   const handleEndTurn = useCallback(async () => {
     if (!gameState || !isMyTurn) return;
     if (needsDiscard(myHand)) {
-      toast.error(`Discard down to 7 cards (you have ${myHand.length})`);
+      setDiscardMode(true);
+      setDiscardSelected([]);
       return;
     }
     const newState = endTurn(gameState);
     await persistState(newState, myHand);
     toast.info('Turn ended');
   }, [gameState, isMyTurn, myHand, persistState]);
+
+  const handleDiscardToggle = (uid: string) => {
+    setDiscardSelected(prev =>
+      prev.includes(uid) ? prev.filter(id => id !== uid) : [...prev, uid]
+    );
+  };
+
+  const handleConfirmDiscard = useCallback(async () => {
+    if (!gameState) return;
+    const result = discardCards(gameState, myHand, discardSelected);
+    setDiscardMode(false);
+    setDiscardSelected([]);
+    await persistState(result.state, result.hand);
+    toast.info('Cards discarded, turn ended');
+  }, [gameState, myHand, discardSelected, persistState]);
 
   const handleCardClick = (uid: string) => {
     if (!isMyTurn || gameState?.phase !== 'playing') return;
