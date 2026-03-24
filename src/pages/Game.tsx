@@ -315,6 +315,43 @@ export default function Game() {
       }
     }
 
+    // Rent gate: check player has properties in at least one matching color
+    if (card.name === 'Rent' || card.name === 'Wild Rent') {
+      const myBoard = gameState.boards[userId];
+      const rentColors = card.colors as PropertyColor[] | undefined;
+      const hasMatchingProps = rentColors
+        ? rentColors.some(c => (myBoard?.properties[c]?.length || 0) > 0)
+        : Object.values(myBoard?.properties || {}).some((p: GameCard[]) => p.length > 0);
+      if (!hasMatchingProps) {
+        toast.error('You need properties in a matching color to charge rent!');
+        return;
+      }
+    }
+
+    // House gate: need a complete set
+    if (card.name === 'House') {
+      const myBoard = gameState.boards[userId];
+      const hasComplete = myBoard && (Object.keys(myBoard.properties) as PropertyColor[]).some(
+        c => isSetComplete(myBoard, c) && !myBoard.hasHouse[c]
+      );
+      if (!hasComplete) {
+        toast.error('You need a complete set without a house to play House!');
+        return;
+      }
+    }
+
+    // Hotel gate: need a complete set with house
+    if (card.name === 'Hotel') {
+      const myBoard = gameState.boards[userId];
+      const hasHousedSet = myBoard && (Object.keys(myBoard.properties) as PropertyColor[]).some(
+        c => isSetComplete(myBoard, c) && myBoard.hasHouse[c] && !myBoard.hasHotel[c]
+      );
+      if (!hasHousedSet) {
+        toast.error('You need a complete set with a house to play Hotel!');
+        return;
+      }
+    }
+
     const needsTarget = ['Debt Collector', 'Sly Deal', 'Forced Deal', 'Deal Breaker', 'Wild Rent'].includes(card.name);
     const needsColor = ['Rent', 'Wild Rent', 'House', 'Hotel'].includes(card.name);
 
