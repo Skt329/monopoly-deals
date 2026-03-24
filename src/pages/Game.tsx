@@ -107,7 +107,7 @@ export default function Game() {
   const [expandedOpponent, setExpandedOpponent] = useState<string | null>(null);
   const [celebration, setCelebration] = useState<{ type: string; message: string; emoji: string } | null>(null);
   const [showLog, setShowLog] = useState(false);
-  const [flyingCards, setFlyingCards] = useState<{ id: string; delay: number }[]>([]);
+  const [flyingCards, setFlyingCards] = useState<{ id: string; delay: number; flyX: number; flyY: number }[]>([]);
   const deckRef = useRef<HTMLDivElement>(null);
 
   const getPlayerName = useCallback((pid: string) => {
