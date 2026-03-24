@@ -1025,7 +1025,7 @@ export default function Game() {
       </div>
 
       {/* Center area - more space */}
-      <div className="flex-1 flex gap-4 px-3 py-2 overflow-auto min-h-0">
+      <div className="flex-1 flex flex-col md:flex-row gap-2 md:gap-4 px-2 md:px-3 py-1.5 md:py-2 overflow-auto min-h-0">
         {/* My properties */}
         <div className="flex-1 flex flex-col gap-1.5 overflow-y-auto min-w-0">
           <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Your Properties</h3>
