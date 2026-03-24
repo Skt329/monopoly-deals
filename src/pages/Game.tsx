@@ -73,7 +73,7 @@ export default function Game() {
         .select('current_state')
         .eq('room_id', room.id)
         .single();
-      if (stateData) setGameState(stateData.current_state as PublicGameState);
+      if (stateData) setGameState(stateData.current_state as unknown as PublicGameState);
 
       // Load hand
       const { data: handData } = await supabase
