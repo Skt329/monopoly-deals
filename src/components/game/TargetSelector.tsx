@@ -26,7 +26,7 @@ export function TargetSelector({
   players, userId, boards, actionType, selectedTarget, selectedColor,
   selectedTargetCard, selectedSourceCard,
   onSelectTarget, onSelectColor, onSelectTargetCard, onSelectSourceCard,
-  onConfirm, onCancel, availableColors
+  onConfirm, onCancel, availableColors, currentPlayerBoard
 }: TargetSelectorProps) {
   const opponents = players.filter(p => p.user_id !== userId);
   const needsTarget = ['Debt Collector', 'Sly Deal', 'Forced Deal', 'Deal Breaker', 'Wild Rent'].includes(actionType);
