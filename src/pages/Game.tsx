@@ -1283,23 +1283,24 @@ export default function Game() {
 
       {/* My hand */}
       {!discardMode && (
-        <div ref={handRef} className="flex-none border-t bg-card/90 backdrop-blur-sm px-3 py-2 shadow-inner max-h-[35vh] overflow-y-auto">
-          <div className="flex items-center gap-2 mb-1">
+        <div ref={handRef} className="flex-none border-t bg-card/90 backdrop-blur-sm px-2 md:px-3 py-1.5 md:py-2 shadow-inner max-h-[25vh] md:max-h-[35vh] overflow-y-auto">
+          <div className="flex items-center gap-1.5 md:gap-2 mb-1">
             <Hand className="w-3 h-3 text-muted-foreground" />
-            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+            <span className="text-[9px] md:text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
               Hand ({myHand.length})
             </span>
             {doubleRentPending && (
-              <Badge variant="destructive" className="text-[9px] animate-pulse">Select a Rent card!</Badge>
+              <Badge variant="destructive" className="text-[8px] md:text-[9px] animate-pulse">Select a Rent card!</Badge>
             )}
           </div>
-          <div className="flex gap-1.5 overflow-x-auto pb-1 justify-center">
+          <div className="flex gap-1 md:gap-1.5 overflow-x-auto pb-1 snap-x snap-mandatory md:snap-none justify-start md:justify-center">
             {myHand.map((card, i) => (
-              <div key={card.uid} className="flex-none" style={{ animationDelay: `${i * 50}ms` }}>
+              <div key={card.uid} className="flex-none snap-center" style={{ animationDelay: `${i * 50}ms` }}>
                 <GameCardComponent
                   card={card}
                   onClick={() => handleCardClick(card.uid)}
                   selected={selectedCard === card.uid}
+                  small
                 />
               </div>
             ))}
