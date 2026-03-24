@@ -68,6 +68,14 @@ interface FlyingCard {
   started: boolean;
 }
 
+interface GameNotification {
+  id: string;
+  playerName: string;
+  action: string;
+  card?: GameCard;
+  timestamp: number;
+}
+
 interface Player {
   user_id: string;
   display_name: string;
