@@ -143,10 +143,20 @@ export function ActionResponsePanel({
 
         {/* Action buttons */}
         <div className="flex gap-3 mt-6">
-          {isPaymentAction && (
+          {isPaymentAction && cantAfford && (
+            <Button
+              onClick={() => onPay(allBankUids, allPropCards)}
+              className="flex-1 gap-2"
+            >
+              <CreditCard className="w-4 h-4" />
+              Pay Everything (M{totalAssets})
+            </Button>
+          )}
+
+          {isPaymentAction && !cantAfford && (
             <Button
               onClick={() => onPay(selectedBankCards, selectedProps)}
-              disabled={totalSelected < amountOwed && (myBoard.bank.length > 0 || Object.values(myBoard.properties).some(p => p.length > 0))}
+              disabled={totalSelected < amountOwed}
               className="flex-1 gap-2"
             >
               <CreditCard className="w-4 h-4" />

@@ -54,6 +54,7 @@ export default function Game() {
   const [userId, setUserId] = useState('');
   const [players, setPlayers] = useState<Player[]>([]);
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
+  const [previewCard, setPreviewCard] = useState<GameCard | null>(null);
   const [roomId, setRoomId] = useState('');
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [dealing, setDealing] = useState(false);
