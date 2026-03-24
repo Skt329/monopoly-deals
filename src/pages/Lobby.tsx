@@ -124,11 +124,11 @@ export default function Lobby() {
 
       // Save each player's hand
       for (const [playerId, hand] of Object.entries(hands)) {
-        const { error: handError } = await supabase.from('player_hands').insert({
+        const { error: handError } = await supabase.from('player_hands').insert([{
           room_id: room.id,
           user_id: playerId,
-          hand,
-        });
+          hand: hand as unknown as import('@/integrations/supabase/types').Json,
+        }]);
         if (handError) throw handError;
       }
 

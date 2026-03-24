@@ -133,8 +133,8 @@ export default function Game() {
     setGameState(newState);
     setMyHand(newHand);
     await Promise.all([
-      supabase.from('game_states').update({ current_state: newState }).eq('room_id', roomId),
-      supabase.from('player_hands').update({ hand: newHand }).eq('room_id', roomId).eq('user_id', userId),
+      supabase.from('game_states').update({ current_state: newState as unknown as import('@/integrations/supabase/types').Json }).eq('room_id', roomId),
+      supabase.from('player_hands').update({ hand: newHand as unknown as import('@/integrations/supabase/types').Json }).eq('room_id', roomId).eq('user_id', userId),
     ]);
   }, [roomId, userId]);
 
