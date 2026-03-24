@@ -354,7 +354,7 @@ export default function Game() {
     if (!result) { toast.error('Cannot play this card'); return; }
     setSelectedCard(null);
     await persistState(result.state, result.hand);
-    broadcastMove(`added M${card?.value || 0} to bank`);
+    broadcastMove(`added M${card?.value || 0} to bank`, card || undefined);
     toast.success('Added to bank!');
     await checkAutoEndTurn(result.state, result.hand);
   }, [gameState, selectedCard, myHand, persistState, checkAutoEndTurn, broadcastMove]);
