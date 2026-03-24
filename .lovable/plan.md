@@ -1,81 +1,71 @@
 
 
-# Implementation Plan: 7 Fixes for Game Mechanics and UI
+# Fix: 6 Game Issues — Draw Animation, Action Messaging, Activity Feed, Exit Game, Property Card Options, Card Details
 
-## 1. Multi-color Rent Card Filtering
-
-**Problem**: Rent/Wild Rent color picker shows ALL colors, even ones the player has no properties for, resulting in 0M rent.
-
-**Fix in `src/components/game/TargetSelector.tsx`**:
-- Add `currentPlayerBoard` prop
-- For `Rent`/`Wild Rent` color selection, filter `availableColors` to only colors where `currentPlayerBoard.properties[color].length > 0`
+## 1. Real card draw animation (deck-to-hand flight)
+**Current**: Dealing animation shows card backs fading in place. No visual of cards flying from deck.
 
 **Fix in `src/pages/Game.tsx`**:
-- Pass `currentPlayerBoard={myBoard}` to `TargetSelector`
-- In `handlePlayAction` for Rent cards: check player has properties in at least one of the card's colors before opening selector
+- Add `flyingCards` state: array of `{ id, startX, startY, endX, endY }` 
+- When `handleDraw` is called, calculate deck position (center area) and hand position (bottom)
+- Render animated card backs that fly from deck to hand using CSS `transform` with `transition`
+- Use `useRef` on the deck element to get its bounding rect
+- All players see the draw via realtime — when another player's `handCounts` increases, show a brief "cards flying from deck toward that player's panel" animation in the opponent area
+- Replace the current static dealing animation with the same flight animation on initial deal
 
-## 2. Opponent Card Details (Expandable)
+## 2. Detailed action card info for all players
+**Current**: When Forced Deal/Sly Deal/Deal Breaker is played, opponents only see a generic "Action Against You!" message. No details about which card/property is targeted.
 
-**Fix in `src/pages/Game.tsx`**:
-- Add `expandedOpponent` state (`string | null`)
-- Clicking an opponent panel toggles expansion showing full property cards (using `GameCardComponent small`) and bank cards
-- Clicking any opponent card opens the existing `previewCard` dialog in read-only mode (no action buttons since it's not your card)
-
-## 3. Property Paid as Rent Goes to Property Pile
-
-**Fix in `src/lib/gameEngine.ts` `payWithCards()`**:
-- Currently line 627 puts ALL payments into `collectorBoard.bank`
-- Split payments: money/action cards → bank, property/wild_property cards → collector's property pile under their original color (using `addPropertyCard`)
-
-## 4. Full Property Card Rendering + Clickable Opponent Sections
+**Fix in `src/components/game/ActionResponsePanel.tsx`**:
+- For `sly_deal`: Show "X wants to steal [card name] from you!" — look up `pendingAction.targetCardUid` in the target's board to get the card name
+- For `forced_deal`: Show "X wants to swap their [source card] for your [target card]!" — look up both `targetCardUid` and `sourceCardUid`
+- For `deal_breaker`: Show "X wants to steal your complete [color] set!" using `pendingAction.targetColor`
 
 **Fix in `src/pages/Game.tsx`**:
-- Player's own properties (line 728): remove `small` prop so cards render at full size with rent tables visible
-- Adjust layout: wrap property groups in a scrollable flex container
-- Opponent expanded view: show full-size cards when expanded
+- After `handleConfirmTarget` resolves (action completes), broadcast a result message via toast to the acting player: "You stole Mediterranean Avenue from Player 2!"
+- After `handleAccept` resolves, show the target: "Player 1 stole your Mediterranean Avenue"
 
-## 5. Action Celebrations
+## 3. Activity feed / move notifications for all players
+**Current**: No notifications when other players play cards.
 
+**Fix**: Use Supabase Broadcast channel to send move notifications.
+- In `src/pages/Game.tsx`, add a `game-moves` broadcast channel
+- After each play action (property, money, action card), broadcast: `{ player: displayName, action: 'played Mediterranean Avenue as property' }` or `{ player: displayName, action: 'added M5 to bank' }`
+- All clients listen on this channel and show a brief toast notification
+- Add a small activity log area or use toast notifications with short auto-dismiss (2s)
+
+## 4. Exit game button + last player auto-win
 **Fix in `src/pages/Game.tsx`**:
-- Add `celebration` state: `{ type: string; message: string; emoji: string } | null`
-- Create a `CelebrationOverlay` component rendered at z-60 with unique animations per action:
-  - Pass Go: "🎉 Drew 2 Cards!" fade-in/scale
-  - Rent: "💰 Collecting M{amount}!" with pulse
-  - Sly Deal: "🕵️ Property Stolen!"
-  - Deal Breaker: "💥 Complete Set Stolen!"
-  - Birthday: "🎂 Happy Birthday!"
-  - Forced Deal: "🔄 Properties Swapped!"
-  - House: "🏠 House Added!"
-  - Hotel: "🏨 Hotel Added!"
-- Auto-dismiss after 2s with `setTimeout`
-- Trigger in `handleConfirmTarget`, `handlePlayAction`, `handleAccept`
-
-## 6. House/Hotel Fixes
+- Add "Exit Game" button in the top bar (with confirmation dialog)
+- On exit: remove player from `game_players`, return their hand cards to the deck (merge with `gameState.deck`), remove their board cards to deck, remove from `playerOrder`
+- Broadcast exit message: "Player X left the game"
+- After removal, check if only 1 player remains → auto-set them as winner, show win screen
+- If the exiting player was the current turn player, advance to next player
 
 **Fix in `src/lib/gameEngine.ts`**:
-- House/Hotel cases (lines 368-387): do NOT add card to `discardPile` (remove from line 240's blanket discard). Instead add the card to `board.properties[targetColor]` so it's visually attached to the set
-- This requires moving the `discardPile` push to be per-case instead of blanket at line 240
+- Add `removePlayer(state, playerId, playerHand)` function that returns cards to deck, removes from playerOrder, adjusts currentPlayerIndex
+
+## 5. Property card should NOT show "Play as Money" option
+**Current**: Line 990-993 shows only "Play as Property" for property cards — this is already correct. But checking the preview dialog code confirms property cards only have one button. Issue might be that the user is seeing it on wild_property cards which DO correctly show both options.
+
+**Verification**: The code at line 990-993 already restricts pure property cards to only "Play as Property". No change needed here. Will double-check and confirm in implementation.
+
+## 6. Property pile cards clickable with full details
+**Current**: Player's own property cards render with `small` prop (line 872), showing minimal info. No click handler to preview.
 
 **Fix in `src/pages/Game.tsx`**:
-- House gate in `handlePlayAction`: require at least one complete set, show error if none
-- Hotel gate: require a complete set WITH a house, show error if none
+- Add `onClick={() => setPreviewCard(card)}` to each property card in "Your Properties" section (line 871)
+- This opens the existing preview dialog showing enlarged card with full details (read-only since it's already played)
+- For opponent expanded view: already has `onClick={() => setPreviewCard(card)}` (line 807) — this works
+- Consider removing `small` prop from player's own properties OR keeping `small` but making them clickable for the preview popup
 
-**Fix in `src/components/game/TargetSelector.tsx`**:
-- For `House` color selection: filter to only complete sets without a house
-- For `Hotel` color selection: filter to only complete sets with a house but no hotel
-
-## 7. Opponent Complete Set Highlighting
-
-**Fix in `src/pages/Game.tsx`**:
-- In opponent section, split properties into two groups: complete sets first with gold highlight/glow, then in-progress sets
-- Complete sets get `ring-2 ring-yellow-400 bg-yellow-50/80 shadow-lg` styling
-- Add "✨ Complete" label
+---
 
 ## Files to Edit
 
 | File | Changes |
 |------|---------|
-| `src/lib/gameEngine.ts` | `payWithCards` routes properties to property pile; `playActionCard` House/Hotel don't go to discard pile, card goes onto set |
-| `src/components/game/TargetSelector.tsx` | Add `currentPlayerBoard` prop; filter rent colors to owned properties; filter House/Hotel to valid sets |
-| `src/pages/Game.tsx` | Rent gate check; expandable opponents; full-size property cards; celebration overlay; House/Hotel gates; complete set highlighting |
+| `src/pages/Game.tsx` | Draw flight animation, broadcast moves channel, exit game button + handler, property card click handlers, action result messages |
+| `src/lib/gameEngine.ts` | Add `removePlayer()` function |
+| `src/components/game/ActionResponsePanel.tsx` | Show specific card/property names in steal action descriptions |
 
