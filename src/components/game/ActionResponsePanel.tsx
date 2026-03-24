@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { type GameCard, type PropertyColor } from '@/data/cards';
+import { type GameCard, type PropertyColor, COLOR_CONFIG } from '@/data/cards';
 import { type PublicGameState, type PlayerBoard } from '@/lib/gameEngine';
 import { GameCardComponent } from './cards/GameCardComponent';
 import { Shield, CreditCard, X } from 'lucide-react';
