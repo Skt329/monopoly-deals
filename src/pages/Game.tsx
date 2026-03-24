@@ -1312,7 +1312,6 @@ export default function Game() {
                   card={card}
                   onClick={() => handleCardClick(card.uid)}
                   selected={selectedCard === card.uid}
-                  small
                 />
               </div>
             ))}
