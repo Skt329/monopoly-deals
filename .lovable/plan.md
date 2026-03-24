@@ -1,79 +1,38 @@
 
 
-# Fix: Complete Action Card Mechanics
+# Fix: Card Play Options & Discard After 3 Plays
 
-## What's Broken
+## Problems
 
-| Card | Issue |
-|------|-------|
-| **Sly Deal** | No property selection UI; accept handler doesn't transfer the property |
-| **Forced Deal** | No UI to pick your card to give + their card to take; no swap logic |
-| **Deal Breaker** | `targetColor` not stored in PendingAction; no set transfer on accept |
-| **Double The Rent** | Does nothing — needs to pair with a rent card as a combo play |
+1. **Wrong play options shown** — Line 774 always shows "Play as Money" for every card type, including money and property cards. A money card should only show "Play" (to bank). A property card should only show "Play as Property". Only action/rent/wild cards need multiple options.
 
-Rent calculation is correct. Just Say No works.
+2. **Can't end turn with >7 cards after 3 plays** — When a player has used all 3 plays but has >7 cards (from Pass Go draws), `handleEndTurn` enters discard mode correctly. But the issue is: if `cardsPlayedThisTurn >= 3`, the player may not realize they need to click "End Turn" to trigger discard mode. The End Turn button exists but the flow is confusing — and there may be an edge case where the discard count check `discardSelected.length < myHand.length - MAX_HAND_SIZE` prevents confirming if the player selects too many or too few cards.
 
----
+## Fix
 
-## Plan
+### 1. Clean up action bar (lines 731-777)
 
-### 1. Extend `PendingAction` type (gameEngine.ts)
-Add fields to store targeting details:
-- `targetColor?: PropertyColor` — for Deal Breaker (which complete set to steal)
-- `targetCardUid?: string` — for Sly Deal (which specific property to steal)
-- `sourceCardUid?: string` — for Forced Deal (attacker's property to give)
-- `doubleRent?: boolean` — flag for doubled rent
+Change the logic so each card type shows only relevant buttons:
 
-### 2. Implement property transfer in `handleAccept` (Game.tsx)
-When target accepts (no Just Say No):
-- **Sly Deal**: Move `targetCardUid` property from target's board to attacker's board (same color group)
-- **Forced Deal**: Swap `targetCardUid` (target→attacker) and `sourceCardUid` (attacker→target)
-- **Deal Breaker**: Move entire `targetColor` property array from target's board to attacker's board
+- **`type === 'money'`**: Show only "Play to Bank" button (no "Play as Property" option)
+- **`type === 'property'`**: Show only "Play as Property" button (no "Play as Money" option)  
+- **`type === 'wild_property'`**: Show "Play as Property" with color picker + "Play as Money"  (wild properties CAN be played as money per Monopoly Deal rules)
+- **`type === 'action'`**: Show "Play Action" + "Play as Money" (actions CAN be banked per rules)
+- **`type === 'rent'`**: Show "Play Action" + "Play as Money" (rents CAN be banked per rules)
 
-### 3. Enhance TargetSelector for property-level selection
-For Sly Deal and Forced Deal, the TargetSelector needs a second step after picking a player:
-- Show the target player's properties (excluding complete sets for Sly Deal per rules)
-- Let attacker click a specific property card to select it
-- For Forced Deal: also show attacker's own properties to pick which one to give
-- For Deal Breaker: show target's complete sets only, pick a color
+### 2. Auto-trigger discard when 3 plays used and hand > 7
 
-New props: `onSelectTargetCard`, `onSelectSourceCard`, `selectedTargetCard`, `selectedSourceCard`
+After playing the 3rd card, if hand > MAX_HAND_SIZE, automatically enter discard mode without requiring the player to click "End Turn" first. This prevents the stuck state.
 
-### 4. Double The Rent combo mechanism
-**Rule**: Double The Rent must be played WITH a rent card in the same turn. It costs 1 of 3 plays and doubles the rent amount.
+In the play handlers (`handlePlayAsMoney`, `handlePlayAsProperty`, `handlePlayAction`, etc.), after persisting state, check:
+- If `cardsPlayedThisTurn` just reached 3 AND new hand size > MAX_HAND_SIZE → set `discardMode = true`
+- If `cardsPlayedThisTurn` just reached 3 AND new hand size <= MAX_HAND_SIZE → auto end turn
 
-Implementation:
-- In Game.tsx, when player selects "Double The Rent" card, check if they have a rent card in hand
-- Show a prompt to select which rent card to pair it with
-- Play both cards together (costs 2 plays total — 1 for rent, 1 for Double The Rent)
-- Set `doubleRent: true` on the PendingAction, and multiply `amountOwed` by 2
-- If no rent card available, show error toast
-
-### 5. Store targeting data in PendingAction
-Update `playActionCard` cases:
-- **Deal Breaker**: Store `targetColor` in pendingAction
-- **Sly Deal**: Add `targetCardUid` parameter, store in pendingAction
-- **Forced Deal**: Add `targetCardUid` + `sourceCardUid` parameters, store in pendingAction
-
----
+Also show a clearer message: "You've used all 3 plays. Discard down to 7 cards to end your turn."
 
 ## Files to Edit
 
-**`src/lib/gameEngine.ts`**:
-- Add `targetColor`, `targetCardUid`, `sourceCardUid` to `PendingAction` interface
-- Update Deal Breaker case to store `targetColor`
-- Add `targetCardUid` and `sourceCardUid` params to `playActionCard`
-- Add `resolveStealAction()` function that handles the actual property transfers for all 3 steal-type cards
-
-**`src/components/game/TargetSelector.tsx`**:
-- Add property card selection step for Sly Deal (show target's non-complete-set properties)
-- Add dual property selection for Forced Deal (pick theirs + pick yours)
-- Add complete set selection for Deal Breaker (show target's complete sets only)
-- Add rent card pairing for Double The Rent
-
 **`src/pages/Game.tsx`**:
-- Update `handleConfirmTarget` to pass `targetCardUid`/`sourceCardUid` to `playActionCard`
-- Rewrite `handleAccept` to call `resolveStealAction()` for steal-type cards and actually transfer properties
-- Add Double The Rent flow: detect DTR card → show rent card picker → play both as combo
-- Update `handlePlayAction` to handle DTR specially
+- Refactor action bar (lines 731-777): conditional buttons per card type
+- After each play action that increments `cardsPlayedThisTurn` to 3, auto-enter discard mode or auto-end turn
 
