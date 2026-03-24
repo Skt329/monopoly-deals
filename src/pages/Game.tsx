@@ -71,6 +71,7 @@ export default function Game() {
   const [doubleRentPending, setDoubleRentPending] = useState(false);
   const [doubleRentCardUid, setDoubleRentCardUid] = useState<string | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const forceEndRef = useRef(false);
 
   // Initialize
   useEffect(() => {
