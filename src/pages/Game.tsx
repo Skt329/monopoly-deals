@@ -115,6 +115,7 @@ export default function Game() {
   const deckRef = useRef<HTMLDivElement>(null);
   const handRef = useRef<HTMLDivElement>(null);
   const movesChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const [gameNotifications, setGameNotifications] = useState<GameNotification[]>([]);
 
   // Helper to get player display name
   const getPlayerName = useCallback((pid: string) => {
