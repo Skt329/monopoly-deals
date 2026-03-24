@@ -1,52 +1,50 @@
 
 
-# Fix: Card Preview, Just Say No, End Turn with Plays Left, and Payment Logic
+# Fix: Forced Deal, Rent Calculation, Property Rearranging, and UI Layout
 
 ## 4 Issues
 
-### 1. Card click should show enlarged popup
-Currently clicking a card in hand selects it for playing. Users need to read card details but cards are too small. Add a card preview dialog that shows an enlarged version when clicking, with action buttons inside the dialog.
+### 1. Forced Deal not showing property selection
+**Root cause**: In `TargetSelector.tsx` line 165, the Forced Deal section shows `stealableProps` (target's properties) and `myOfferableProps` (your properties). However, the Forced Deal card should only be playable if the current player HAS properties. Currently there's no gate check in `handlePlayAction`. Also the TargetSelector already has the UI for both selections — need to verify it's actually rendering. The issue is likely that `getStealableProperties` checks `boards[userId]` but the user's properties might be stored under a different key, OR `myOfferableProps` is empty because the player has no properties in non-complete sets.
 
-### 2. Just Say No should only be playable as response or money
-Currently "Just Say No" shows "Play Action" + "Play as Money" in the action bar (line 797-805). The "Play Action" button should be removed — JSN can only be played reactively (via ActionResponsePanel) or banked as money.
+**Fix**: 
+- In `Game.tsx` `handlePlayAction`: when card is "Forced Deal", check that the player has at least 1 property on their board before opening the target selector. Show error toast if not.
+- Same for "Sly Deal" — check opponents have stealable properties.
 
-### 3. End Turn should not force discard if plays remain
-Currently `handleEndTurn` (line 450-460) checks `needsDiscard` and immediately enters discard mode. But if `cardsPlayedThisTurn < 3`, the player still has plays available and may want to use them to reduce hand size. Only force discard when all 3 plays are exhausted.
+### 2. Rent cards showing 0M
+**Root cause**: `calculateRent()` (line 516-527) looks up `rentTable[propCount]` — this works correctly. The issue is in the Rent card flow: when the user selects a color in `TargetSelector`, `handleConfirmTarget` calls `playActionCard` with `selectedColor`. But the rent is calculated using `state.boards[playerId]` which should have the properties. 
 
-### 4. Payment: if total assets < debt, auto-pay everything; if more, let user choose
-Currently `ActionResponsePanel` disables the Pay button if `totalSelected < amountOwed` AND the player has assets (line 133). Per Monopoly Deal rules, if you can't afford the full amount, you pay everything you have. If you have more than enough, you choose what to pay.
+The real bug: the rent table uses 1-indexed keys (`{1: 1, 2: 2, 3: 3}`), and `propCount` is correct. BUT — if `propCount` exceeds the table keys (e.g., 4 properties in a 3-size set), `rentTable[4]` is `undefined`, returning 0. Also, wild properties placed on a color count toward that color's property count, so this should work. Need to clamp propCount to max table key.
+
+**Fix**: In `calculateRent`, clamp `propCount` to the max key in the rent table: `const clampedCount = Math.min(propCount, PROPERTY_SETS[color].size)`. This ensures extra wilds don't break the lookup.
+
+### 3. Property rearranging (wild card reassignment)
+**Root cause**: No mechanism exists to move a wild property card from one color group to another on your own board.
+
+**Fix**: Add a "Rearrange" button on played wild property cards. When clicked, show a color picker to reassign it. This doesn't cost a play — it's a free action per Monopoly Deal rules. Add `rearrangeWildProperty()` to `gameEngine.ts` and a UI trigger in `Game.tsx`.
+
+### 4. UI/UX: bank cards should stack, layout needs improvement
+**Root cause**: Bank cards are shown individually spread out, taking too much space. The overall layout is cramped.
+
+**Fix**:
+- **Stack bank cards**: Show a single pile with a count badge and total value. Only expand when paying rent (already done in ActionResponsePanel).
+- **Better layout**: Give more space to the center area, reduce opponent panel sizes, use a cleaner grid layout.
 
 ---
 
-## Changes
+## Files to Edit
+
+### `src/lib/gameEngine.ts`
+- Fix `calculateRent`: clamp `propCount` to `PROPERTY_SETS[color].size` so excess wilds don't return 0
+- Add `rearrangeWildProperty(state, playerId, cardUid, newColor)` function — moves a wild/property card from its current color to a new valid color on the same player's board (free action, no play cost)
+
+### `src/components/game/TargetSelector.tsx`
+- No changes needed — Forced Deal UI already exists with both selection steps
 
 ### `src/pages/Game.tsx`
-
-**Card preview dialog:**
-- Add `previewCard` state (`GameCard | null`)
-- On card click: if tapping same card that's already selected, open preview dialog. First tap selects, second tap previews. OR: single tap opens preview with action buttons inside.
-- Better UX: single click opens a Dialog with the enlarged card + action buttons. The dialog replaces the bottom action bar.
-- Import `Dialog` from ui components
-
-**Just Say No restriction:**
-- In the action bar section (line 797), add condition: if `selectedCardData.name === 'Just Say No'`, only show "Play as Money" button, not "Play Action"
-
-**End Turn with plays remaining:**
-- In `handleEndTurn` (line 450-460): if `myHand.length > MAX_HAND_SIZE` AND `cardsPlayedThisTurn < 3`, show a toast warning "You have plays remaining! Use them to reduce your hand, or discard." with a force-discard option
-- Add a separate "Force End Turn" flow: show a confirmation that says "You still have X plays left. End turn anyway?" — if confirmed AND hand > 7, then enter discard mode
-
-**Payment logic in `ActionResponsePanel`:**
-- Calculate `totalAssets` (all bank + all property values)
-- If `totalAssets <= amountOwed`: show "Pay All (M{totalAssets})" button that auto-selects everything — no manual selection needed
-- If `totalAssets > amountOwed`: show current selection UI, require `totalSelected >= amountOwed`
-
-### `src/components/game/ActionResponsePanel.tsx`
-
-- Add `totalAssets` calculation
-- If `totalAssets <= amountOwed`: render a single "Pay Everything" button that calls `onPay` with all bank card uids and all property cards
-- If `totalAssets > amountOwed`: keep current selection UI but enable pay button only when `totalSelected >= amountOwed`
-
-### Files
-- **Edit**: `src/pages/Game.tsx` — card preview dialog, JSN restriction, end turn logic
-- **Edit**: `src/components/game/ActionResponsePanel.tsx` — smart payment logic
+- **Forced Deal gate**: Before opening target selector, check player has properties. Show error if not.
+- **Sly Deal gate**: Check opponents have stealable properties before opening selector.
+- **Property rearranging UI**: On each wild property card in "Your Properties", show a small rearrange icon. Clicking opens a color picker to move it to another valid color group. Calls `rearrangeWildProperty()` and persists.
+- **Stacked bank UI**: Replace individual bank card display with a stacked pile showing count + total. Show a tooltip or small overlay with individual cards on hover.
+- **Layout improvements**: Increase center area flex, reduce opponent panel min-width, better spacing.
 
