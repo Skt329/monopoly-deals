@@ -13,7 +13,15 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ['Inter', 'sans-serif'],
+        display: ['Space Grotesk', 'sans-serif'],
+      },
       colors: {
+        'game-surface': 'hsl(var(--game-surface))',
+        'game-felt': 'hsl(var(--game-felt))',
+        'game-gold': 'hsl(var(--game-gold))',
+        'game-gold-foreground': 'hsl(var(--game-gold-foreground))',
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
