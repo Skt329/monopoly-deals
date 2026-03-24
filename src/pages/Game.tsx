@@ -312,11 +312,13 @@ export default function Game() {
 
   const handlePlayAsProperty = useCallback(async (color: PropertyColor) => {
     if (!gameState || !selectedCard) return;
+    const card = myHand.find(c => c.uid === selectedCard);
     const result = playCardAsProperty(gameState, myHand, selectedCard, color);
     if (!result) { toast.error('Cannot play this card'); return; }
     setSelectedCard(null);
     setShowColorPicker(false);
     await persistState(result.state, result.hand);
+    broadcastMove(`played ${card?.name || 'property'} as ${COLOR_CONFIG[color].label} property`);
 
     if (result.state.winner) {
       toast.success('🎉 You completed 3 sets! YOU WIN!', { duration: 10000 });
@@ -324,7 +326,7 @@ export default function Game() {
       toast.success('Property played!');
       await checkAutoEndTurn(result.state, result.hand);
     }
-  }, [gameState, selectedCard, myHand, persistState, checkAutoEndTurn]);
+  }, [gameState, selectedCard, myHand, persistState, checkAutoEndTurn, broadcastMove]);
 
   const handlePlayAsMoney = useCallback(async () => {
     if (!gameState || !selectedCard) return;
