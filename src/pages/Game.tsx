@@ -209,6 +209,28 @@ export default function Game() {
     };
   }, [roomId, userId]);
 
+  // Broadcast channel for move notifications
+  useEffect(() => {
+    if (!roomId) return;
+    const movesChannel = supabase.channel(`game-moves-${roomId}`);
+    movesChannel.on('broadcast', { event: 'move' }, ({ payload }) => {
+      if (payload.playerId !== userId) {
+        toast.info(`${payload.playerName}: ${payload.action}`, { duration: 2500 });
+      }
+    }).subscribe();
+    movesChannelRef.current = movesChannel;
+    return () => { supabase.removeChannel(movesChannel); };
+  }, [roomId, userId]);
+
+  const broadcastMove = useCallback((action: string) => {
+    const name = getPlayerName(userId);
+    movesChannelRef.current?.send({
+      type: 'broadcast',
+      event: 'move',
+      payload: { playerId: userId, playerName: name, action },
+    });
+  }, [userId, getPlayerName]);
+
   // Poll for game state changes as backup (every 3s)
   useEffect(() => {
     if (!roomId || !userId) return;
