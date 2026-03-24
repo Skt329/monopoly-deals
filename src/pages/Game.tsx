@@ -23,9 +23,12 @@ import {
   countCompleteSets,
   getBankTotal,
   createEmptyBoard,
+  payWithCards,
 } from '@/lib/gameEngine';
 import { GameCardComponent } from '@/components/game/cards/GameCardComponent';
 import { CardBack } from '@/components/game/cards/CardBack';
+import { ActionResponsePanel } from '@/components/game/ActionResponsePanel';
+import { TargetSelector } from '@/components/game/TargetSelector';
 import { DollarSign, Trophy, ChevronRight, Layers, Hand, Sparkles } from 'lucide-react';
 
 interface Player {
@@ -46,6 +49,10 @@ export default function Game() {
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [dealing, setDealing] = useState(false);
   const [dealtCards, setDealtCards] = useState<number>(0);
+  const [showTargetSelector, setShowTargetSelector] = useState(false);
+  const [targetAction, setTargetAction] = useState<string>('');
+  const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
+  const [selectedColor, setSelectedColor] = useState<PropertyColor | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   // Initialize
@@ -70,7 +77,6 @@ export default function Game() {
         .order('player_order');
       setPlayers(playersData || []);
 
-      // Load game state
       const { data: stateData } = await supabase
         .from('game_states')
         .select('current_state')
@@ -80,7 +86,6 @@ export default function Game() {
         const state = stateData.current_state as unknown as PublicGameState;
         setGameState(state);
         
-        // Check if this is a fresh game (first load) - show deal animation
         const handData = await supabase
           .from('player_hands')
           .select('hand')
@@ -90,7 +95,6 @@ export default function Game() {
         
         if (handData.data) {
           const hand = handData.data.hand as unknown as GameCard[];
-          // If all players have starting hands and no cards played, show deal animation
           const noCardsPlayed = Object.values(state.boards).every(
             (b: PlayerBoard) => b.bank.length === 0 && Object.values(b.properties).every((p: GameCard[]) => p.length === 0)
           );
@@ -98,7 +102,6 @@ export default function Game() {
           if (noCardsPlayed && hand.length > 0) {
             setDealing(true);
             setDealtCards(0);
-            // Animate dealing cards one by one
             for (let i = 0; i < hand.length; i++) {
               await new Promise(r => setTimeout(r, 200));
               setDealtCards(i + 1);
@@ -208,17 +211,113 @@ export default function Game() {
     toast.success('Added to bank!');
   }, [gameState, selectedCard, myHand, persistState]);
 
-  const handlePlayAction = useCallback(async () => {
+  // Action card play - opens target selector if needed
+  const handlePlayAction = useCallback(() => {
     if (!gameState || !selectedCard) return;
     const card = myHand.find(c => c.uid === selectedCard);
     if (!card) return;
 
+    const needsTarget = ['Debt Collector', 'Sly Deal', 'Forced Deal', 'Deal Breaker', 'Wild Rent'].includes(card.name);
+    const needsColor = ['Rent', 'Wild Rent', 'House', 'Hotel'].includes(card.name);
+
+    if (needsTarget || needsColor) {
+      setTargetAction(card.name);
+      setSelectedTarget(null);
+      setSelectedColor(null);
+      setShowTargetSelector(true);
+      return;
+    }
+
+    // Direct play (Pass Go, etc.)
     const result = playActionCard(gameState, myHand, selectedCard);
     if (!result) { toast.error('Cannot play this action'); return; }
     setSelectedCard(null);
-    await persistState(result.state, result.hand);
+    persistState(result.state, result.hand);
     toast.success(`${card.name} played!`);
   }, [gameState, selectedCard, myHand, persistState]);
+
+  // Confirm target selection and play action
+  const handleConfirmTarget = useCallback(async () => {
+    if (!gameState || !selectedCard) return;
+    const card = myHand.find(c => c.uid === selectedCard);
+    if (!card) return;
+
+    const result = playActionCard(gameState, myHand, selectedCard, selectedTarget || undefined, selectedColor || undefined);
+    if (!result) { toast.error('Cannot play this action'); return; }
+    
+    setSelectedCard(null);
+    setShowTargetSelector(false);
+    setSelectedTarget(null);
+    setSelectedColor(null);
+    await persistState(result.state, result.hand);
+    toast.success(`${card.name} played!`);
+  }, [gameState, selectedCard, myHand, selectedTarget, selectedColor, persistState]);
+
+  // Handle paying for an action (as a target)
+  const handlePay = useCallback(async (bankCardUids: string[], propertyCards: { uid: string; color: PropertyColor }[]) => {
+    if (!gameState || !gameState.pendingAction) return;
+    const pending = gameState.pendingAction;
+    const myBoard = gameState.boards[userId] || createEmptyBoard();
+
+    const payResult = payWithCards(gameState, myBoard, pending.sourcePlayerId, bankCardUids, propertyCards);
+    
+    const newResponded = [...pending.respondedPlayers, userId];
+    const allResponded = pending.targetPlayerIds.every(id => newResponded.includes(id));
+
+    const newState: PublicGameState = {
+      ...payResult.state,
+      pendingAction: allResponded ? null : { ...pending, respondedPlayers: newResponded },
+      phase: allResponded ? 'playing' : 'responding',
+    };
+
+    await persistState(newState, myHand);
+    toast.success('Payment sent!');
+  }, [gameState, userId, myHand, persistState]);
+
+  // Handle Just Say No
+  const handleJustSayNo = useCallback(async () => {
+    if (!gameState || !gameState.pendingAction) return;
+    const pending = gameState.pendingAction;
+
+    // Remove Just Say No from hand
+    const jsnIndex = myHand.findIndex(c => c.name === 'Just Say No');
+    if (jsnIndex === -1) return;
+    const newHand = myHand.filter((_, i) => i !== jsnIndex);
+    const jsnCard = myHand[jsnIndex];
+
+    const newResponded = [...pending.respondedPlayers, userId];
+    const allResponded = pending.targetPlayerIds.every(id => newResponded.includes(id));
+
+    const newState: PublicGameState = {
+      ...gameState,
+      discardPile: [...gameState.discardPile, jsnCard],
+      pendingAction: allResponded ? null : { ...pending, respondedPlayers: newResponded },
+      phase: allResponded ? 'playing' : 'responding',
+      handCounts: { ...gameState.handCounts, [userId]: newHand.length },
+    };
+
+    await persistState(newState, newHand);
+    toast.success('Just Say No! Action blocked! 🛡️');
+  }, [gameState, userId, myHand, persistState]);
+
+  // Handle accepting steal actions
+  const handleAccept = useCallback(async () => {
+    if (!gameState || !gameState.pendingAction) return;
+    const pending = gameState.pendingAction;
+
+    // For now, accept without transfer logic (simplified)
+    const newResponded = [...pending.respondedPlayers, userId];
+    const allResponded = pending.targetPlayerIds.every(id => newResponded.includes(id));
+
+    const newState: PublicGameState = {
+      ...gameState,
+      pendingAction: allResponded ? null : { ...pending, respondedPlayers: newResponded },
+      phase: allResponded ? 'playing' : 'responding',
+    };
+
+    await persistState(newState, myHand);
+    toast.info('Action accepted');
+  }, [gameState, userId, myHand, persistState]);
 
   const handleEndTurn = useCallback(async () => {
     if (!gameState || !isMyTurn) return;
@@ -284,6 +383,37 @@ export default function Game() {
 
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden">
+      {/* Action Response Panel - shown when an action is pending against us */}
+      {gameState.phase === 'responding' && gameState.pendingAction && (
+        <ActionResponsePanel
+          gameState={gameState}
+          userId={userId}
+          myHand={myHand}
+          myBoard={myBoard}
+          players={players}
+          onPay={handlePay}
+          onJustSayNo={handleJustSayNo}
+          onAccept={handleAccept}
+        />
+      )}
+
+      {/* Target Selector - shown when playing action that needs target/color */}
+      {showTargetSelector && (
+        <TargetSelector
+          players={players}
+          userId={userId}
+          boards={gameState.boards}
+          actionType={targetAction}
+          selectedTarget={selectedTarget}
+          selectedColor={selectedColor}
+          onSelectTarget={setSelectedTarget}
+          onSelectColor={setSelectedColor}
+          onConfirm={handleConfirmTarget}
+          onCancel={() => { setShowTargetSelector(false); setSelectedCard(null); }}
+          availableColors={selectedCardData?.colors as PropertyColor[] | undefined}
+        />
+      )}
+
       {/* Top bar */}
       <div className="flex items-center justify-between px-4 py-2 border-b bg-card shadow-sm">
         <div className="flex items-center gap-3">
@@ -299,10 +429,15 @@ export default function Game() {
               Plays: {gameState.cardsPlayedThisTurn}/3
             </Badge>
           )}
+          {gameState.phase === 'responding' && (
+            <Badge variant="destructive" className="animate-pulse">
+              ⚡ Waiting for response...
+            </Badge>
+          )}
         </div>
       </div>
 
-      {/* Opponents area - shows their played cards */}
+      {/* Opponents area */}
       <div className="flex-none flex gap-3 px-4 py-3 overflow-x-auto border-b bg-muted/30">
         {players.filter(p => p.user_id !== userId).map(player => {
           const board: PlayerBoard = gameState.boards[player.user_id] || createEmptyBoard();
@@ -326,7 +461,7 @@ export default function Game() {
                 </div>
               </div>
 
-              {/* Opponent's played properties - visible to all */}
+              {/* Opponent's played properties */}
               <div className="flex flex-wrap gap-1 mb-2">
                 {(Object.keys(board.properties) as PropertyColor[]).map(color => {
                   const props = board.properties[color];
@@ -334,10 +469,7 @@ export default function Game() {
                   const setSize = PROPERTY_SETS[color].size;
                   const isComplete = props.length >= setSize;
                   return (
-                    <div
-                      key={color}
-                      className={`rounded-lg border p-1 ${isComplete ? 'border-yellow-400 shadow-md bg-yellow-50' : 'border-border'}`}
-                    >
+                    <div key={color} className={`rounded-lg border p-1 ${isComplete ? 'border-yellow-400 shadow-md bg-yellow-50' : 'border-border'}`}>
                       <div className="flex gap-0.5">
                         {props.map(card => (
                           <GameCardComponent key={card.uid} card={card} small />
@@ -349,7 +481,7 @@ export default function Game() {
                 })}
               </div>
 
-              {/* Opponent's bank - visible */}
+              {/* Opponent's bank */}
               {board.bank.length > 0 && (
                 <div className="flex gap-0.5 flex-wrap">
                   <span className="text-[8px] text-muted-foreground font-bold mr-1">Bank:</span>
@@ -359,7 +491,7 @@ export default function Game() {
                 </div>
               )}
 
-              {/* Hidden hand - card backs */}
+              {/* Hidden hand */}
               <div className="flex gap-0.5 mt-2">
                 {Array.from({ length: Math.min(handCount, 7) }).map((_, i) => (
                   <CardBack key={i} small className="scale-[0.5] -mx-1.5" />
@@ -370,7 +502,7 @@ export default function Game() {
         })}
       </div>
 
-      {/* Center area - Board & Deck */}
+      {/* Center area */}
       <div className="flex-1 flex items-center justify-center gap-8 px-4 overflow-auto">
         {/* My properties */}
         <div className="flex flex-col gap-2 max-w-[450px]">
@@ -382,7 +514,7 @@ export default function Game() {
               const setSize = PROPERTY_SETS[color].size;
               const isComplete = props.length >= setSize;
               return (
-                <div key={color} className={`rounded-lg p-2 border ${isComplete ? 'border-yellow-400 shadow-lg bg-yellow-50 animate-set-complete' : 'border-border'}`}>
+                <div key={color} className={`rounded-lg p-2 border ${isComplete ? 'border-yellow-400 shadow-lg bg-yellow-50' : 'border-border'}`}>
                   <div className="flex gap-1 mb-1">
                     {props.map(card => (
                       <GameCardComponent key={card.uid} card={card} small />
