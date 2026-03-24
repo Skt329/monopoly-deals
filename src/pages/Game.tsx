@@ -1163,30 +1163,25 @@ export default function Game() {
                   )}
 
                   {previewCard.type === 'wild_property' && (
-                    <>
-                      <div className="flex flex-col gap-1">
-                        <Button size="sm" variant="outline" className="w-full" onClick={() => setShowColorPicker(!showColorPicker)}>
-                          Play as Property
-                        </Button>
-                        {showColorPicker && (
-                          <div className="flex gap-1 justify-center flex-wrap">
-                            {previewCard.colors?.map(color => (
-                              <button
-                                key={color}
-                                onClick={() => { setPreviewCard(null); handlePlayAsProperty(color); }}
-                                className={`${COLOR_CONFIG[color].bg} px-2 py-1 rounded text-[10px] font-bold ${COLOR_CONFIG[color].text} hover:scale-110 transition-transform`}
-                                title={COLOR_CONFIG[color].label}
-                              >
-                                {COLOR_CONFIG[color].label}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <Button size="sm" variant="secondary" className="w-full" onClick={() => { setPreviewCard(null); handlePlayAsMoney(); }}>
-                        Play as Money (M{previewCard.value})
+                    <div className="flex flex-col gap-1">
+                      <Button size="sm" variant="outline" className="w-full" onClick={() => setShowColorPicker(!showColorPicker)}>
+                        Play as Property
                       </Button>
-                    </>
+                      {showColorPicker && (
+                        <div className="flex gap-1 justify-center flex-wrap">
+                          {previewCard.colors?.map(color => (
+                            <button
+                              key={color}
+                              onClick={() => { setPreviewCard(null); handlePlayAsProperty(color); }}
+                              className={`${COLOR_CONFIG[color].bg} px-2 py-1 rounded text-[10px] font-bold ${COLOR_CONFIG[color].text} hover:scale-110 transition-transform`}
+                              title={COLOR_CONFIG[color].label}
+                            >
+                              {COLOR_CONFIG[color].label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
 
                   {previewCard.type === 'action' && !doubleRentPending && (
