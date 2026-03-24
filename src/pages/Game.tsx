@@ -26,6 +26,7 @@ import {
   getBankTotal,
   createEmptyBoard,
   payWithCards,
+  resolveStealAction,
 } from '@/lib/gameEngine';
 import { GameCardComponent } from '@/components/game/cards/GameCardComponent';
 import { CardBack } from '@/components/game/cards/CardBack';
@@ -55,8 +56,13 @@ export default function Game() {
   const [targetAction, setTargetAction] = useState<string>('');
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<PropertyColor | null>(null);
+  const [selectedTargetCard, setSelectedTargetCard] = useState<string | null>(null);
+  const [selectedSourceCard, setSelectedSourceCard] = useState<string | null>(null);
   const [discardMode, setDiscardMode] = useState(false);
   const [discardSelected, setDiscardSelected] = useState<string[]>([]);
+  // Double The Rent combo state
+  const [doubleRentPending, setDoubleRentPending] = useState(false);
+  const [doubleRentCardUid, setDoubleRentCardUid] = useState<string | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   // Initialize
@@ -221,6 +227,26 @@ export default function Game() {
     const card = myHand.find(c => c.uid === selectedCard);
     if (!card) return;
 
+    // Double The Rent: check if we have a rent card to pair with
+    if (card.name === 'Double The Rent') {
+      const hasRentCard = myHand.some(c => c.uid !== card.uid && (c.type === 'rent'));
+      if (!hasRentCard) {
+        toast.error('You need a rent card to pair with Double The Rent!');
+        return;
+      }
+      // Check if we have enough plays left (need 2: one for DTR, one for rent)
+      if (gameState.cardsPlayedThisTurn >= 2) {
+        toast.error('Not enough plays left for Double The Rent combo (needs 2 plays)');
+        return;
+      }
+      // First, discard the DTR card and increment plays
+      setDoubleRentPending(true);
+      setDoubleRentCardUid(selectedCard);
+      setSelectedCard(null);
+      toast.info('Double The Rent activated! Now select a rent card to play.');
+      return;
+    }
+
     const needsTarget = ['Debt Collector', 'Sly Deal', 'Forced Deal', 'Deal Breaker', 'Wild Rent'].includes(card.name);
     const needsColor = ['Rent', 'Wild Rent', 'House', 'Hotel'].includes(card.name);
 
@@ -228,11 +254,22 @@ export default function Game() {
       setTargetAction(card.name);
       setSelectedTarget(null);
       setSelectedColor(null);
+      setSelectedTargetCard(null);
+      setSelectedSourceCard(null);
       setShowTargetSelector(true);
       return;
     }
 
-    // Direct play (Pass Go, etc.)
+    // Direct play (Pass Go, It's Your Birthday, etc.)
+    if (card.name === "It's Your Birthday") {
+      const result = playActionCard(gameState, myHand, selectedCard);
+      if (!result) { toast.error('Cannot play this action'); return; }
+      setSelectedCard(null);
+      persistState(result.state, result.hand);
+      toast.success(`${card.name} played!`);
+      return;
+    }
+
     const result = playActionCard(gameState, myHand, selectedCard);
     if (!result) { toast.error('Cannot play this action'); return; }
     setSelectedCard(null);
@@ -240,22 +277,74 @@ export default function Game() {
     toast.success(`${card.name} played!`);
   }, [gameState, selectedCard, myHand, persistState]);
 
+  // When Double Rent is pending and user selects a rent card
+  const handlePlayRentWithDouble = useCallback(async () => {
+    if (!gameState || !selectedCard || !doubleRentCardUid) return;
+    const rentCard = myHand.find(c => c.uid === selectedCard);
+    if (!rentCard || rentCard.type !== 'rent') {
+      toast.error('Please select a rent card');
+      return;
+    }
+
+    // First, consume the DTR card
+    const dtrIndex = myHand.findIndex(c => c.uid === doubleRentCardUid);
+    if (dtrIndex === -1) return;
+    const dtrCard = myHand[dtrIndex];
+    const handAfterDTR = myHand.filter((_, i) => i !== dtrIndex);
+
+    // Increment plays for DTR
+    const stateAfterDTR: PublicGameState = {
+      ...gameState,
+      discardPile: [...gameState.discardPile, dtrCard],
+      cardsPlayedThisTurn: gameState.cardsPlayedThisTurn + 1,
+      handCounts: { ...gameState.handCounts, [userId]: handAfterDTR.length },
+    };
+
+    // Now open target selector for the rent card with doubleRent flag
+    setTargetAction(rentCard.name);
+    setSelectedTarget(null);
+    setSelectedColor(null);
+    setSelectedTargetCard(null);
+    setSelectedSourceCard(null);
+    setShowTargetSelector(true);
+
+    // Store intermediate state
+    setGameState(stateAfterDTR);
+    setMyHand(handAfterDTR);
+    // Update DB with DTR consumed
+    await Promise.all([
+      supabase.from('game_states').update({ current_state: stateAfterDTR as unknown as import('@/integrations/supabase/types').Json }).eq('room_id', roomId),
+      supabase.from('player_hands').update({ hand: handAfterDTR as unknown as import('@/integrations/supabase/types').Json }).eq('room_id', roomId).eq('user_id', userId),
+    ]);
+  }, [gameState, selectedCard, doubleRentCardUid, myHand, userId, roomId]);
+
   // Confirm target selection and play action
   const handleConfirmTarget = useCallback(async () => {
     if (!gameState || !selectedCard) return;
     const card = myHand.find(c => c.uid === selectedCard);
     if (!card) return;
 
-    const result = playActionCard(gameState, myHand, selectedCard, selectedTarget || undefined, selectedColor || undefined);
+    const result = playActionCard(
+      gameState, myHand, selectedCard,
+      selectedTarget || undefined,
+      selectedColor || undefined,
+      selectedTargetCard || undefined,
+      selectedSourceCard || undefined,
+      doubleRentPending
+    );
     if (!result) { toast.error('Cannot play this action'); return; }
     
     setSelectedCard(null);
     setShowTargetSelector(false);
     setSelectedTarget(null);
     setSelectedColor(null);
+    setSelectedTargetCard(null);
+    setSelectedSourceCard(null);
+    setDoubleRentPending(false);
+    setDoubleRentCardUid(null);
     await persistState(result.state, result.hand);
-    toast.success(`${card.name} played!`);
-  }, [gameState, selectedCard, myHand, selectedTarget, selectedColor, persistState]);
+    toast.success(`${card.name} played!${doubleRentPending ? ' (DOUBLED!)' : ''}`);
+  }, [gameState, selectedCard, myHand, selectedTarget, selectedColor, selectedTargetCard, selectedSourceCard, doubleRentPending, persistState]);
 
   // Handle paying for an action (as a target)
   const handlePay = useCallback(async (bankCardUids: string[], propertyCards: { uid: string; color: PropertyColor }[]) => {
@@ -283,7 +372,6 @@ export default function Game() {
     if (!gameState || !gameState.pendingAction) return;
     const pending = gameState.pendingAction;
 
-    // Remove Just Say No from hand
     const jsnIndex = myHand.findIndex(c => c.name === 'Just Say No');
     if (jsnIndex === -1) return;
     const newHand = myHand.filter((_, i) => i !== jsnIndex);
@@ -304,23 +392,36 @@ export default function Game() {
     toast.success('Just Say No! Action blocked! 🛡️');
   }, [gameState, userId, myHand, persistState]);
 
-  // Handle accepting steal actions
+  // Handle accepting steal actions — now actually transfers properties
   const handleAccept = useCallback(async () => {
     if (!gameState || !gameState.pendingAction) return;
     const pending = gameState.pendingAction;
 
-    // For now, accept without transfer logic (simplified)
+    let stateAfterResolve = gameState;
+
+    // Execute the steal/transfer
+    if (['deal_breaker', 'sly_deal', 'forced_deal'].includes(pending.type)) {
+      stateAfterResolve = resolveStealAction(gameState, pending, userId);
+    }
+
     const newResponded = [...pending.respondedPlayers, userId];
     const allResponded = pending.targetPlayerIds.every(id => newResponded.includes(id));
 
     const newState: PublicGameState = {
-      ...gameState,
+      ...stateAfterResolve,
       pendingAction: allResponded ? null : { ...pending, respondedPlayers: newResponded },
       phase: allResponded ? 'playing' : 'responding',
     };
 
+    // Check win condition for the attacker after steal
+    const attackerBoard = newState.boards[pending.sourcePlayerId];
+    if (attackerBoard && countCompleteSets(attackerBoard) >= 3) {
+      newState.winner = pending.sourcePlayerId;
+      newState.phase = 'finished';
+    }
+
     await persistState(newState, myHand);
-    toast.info('Action accepted');
+    toast.info('Action accepted — properties transferred');
   }, [gameState, userId, myHand, persistState]);
 
   const handleEndTurn = useCallback(async () => {
@@ -426,10 +527,19 @@ export default function Game() {
           actionType={targetAction}
           selectedTarget={selectedTarget}
           selectedColor={selectedColor}
+          selectedTargetCard={selectedTargetCard}
+          selectedSourceCard={selectedSourceCard}
           onSelectTarget={setSelectedTarget}
           onSelectColor={setSelectedColor}
+          onSelectTargetCard={setSelectedTargetCard}
+          onSelectSourceCard={setSelectedSourceCard}
           onConfirm={handleConfirmTarget}
-          onCancel={() => { setShowTargetSelector(false); setSelectedCard(null); }}
+          onCancel={() => {
+            setShowTargetSelector(false);
+            setSelectedCard(null);
+            setDoubleRentPending(false);
+            setDoubleRentCardUid(null);
+          }}
           availableColors={selectedCardData?.colors as PropertyColor[] | undefined}
         />
       )}
@@ -454,6 +564,11 @@ export default function Game() {
             }`}>
               🎴 {gameState.cardsPlayedThisTurn} / 3
             </div>
+          )}
+          {doubleRentPending && (
+            <Badge variant="destructive" className="animate-pulse">
+              ⚡ Double Rent Active — Pick a Rent Card!
+            </Badge>
           )}
           {gameState.phase === 'responding' && (
             <Badge variant="destructive" className="animate-pulse">
@@ -643,9 +758,16 @@ export default function Game() {
             </>
           )}
 
-          {(selectedCardData.type === 'action' || selectedCardData.type === 'rent') && (
+          {(selectedCardData.type === 'action' || selectedCardData.type === 'rent') && !doubleRentPending && (
             <Button size="sm" onClick={handlePlayAction}>
               Play Action
+            </Button>
+          )}
+
+          {/* When Double Rent is active and user picks a rent card */}
+          {doubleRentPending && selectedCardData.type === 'rent' && (
+            <Button size="sm" variant="destructive" onClick={handlePlayRentWithDouble}>
+              🔥 Play with Double Rent!
             </Button>
           )}
 
@@ -696,6 +818,11 @@ export default function Game() {
             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Your Hand ({myHand.length})
             </span>
+            {doubleRentPending && (
+              <Badge variant="destructive" className="text-[10px] animate-pulse">
+                Select a Rent card!
+              </Badge>
+            )}
           </div>
           <div className="flex gap-2 overflow-x-auto pb-2 justify-center">
             {myHand.map((card, i) => (
