@@ -116,7 +116,7 @@ export default function Game() {
           .eq('room_id', roomId)
           .eq('user_id', userId)
           .single();
-        if (data) setMyHand(data.hand as GameCard[]);
+        if (data) setMyHand(data.hand as unknown as GameCard[]);
       })
       .subscribe();
 
