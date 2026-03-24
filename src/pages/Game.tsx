@@ -557,8 +557,8 @@ export default function Game() {
     toast.success(`${card.name} played!${rentAmount ? ` Collecting M${rentAmount}` : ''}${doubleRentPending ? ' (DOUBLED!)' : ''}`);
     // Trigger celebrations
     const celebrationMap: Record<string, { msg: string; emoji: string }> = {
-      'Rent': { msg: `Collecting Rent!`, emoji: '💰' },
-      'Wild Rent': { msg: `Collecting Rent!`, emoji: '💰' },
+      'Rent': { msg: `Collecting M${rentAmount || '?'} Rent!`, emoji: '💰' },
+      'Wild Rent': { msg: `Collecting M${rentAmount || '?'} Rent!`, emoji: '💰' },
       'Sly Deal': { msg: 'Property Stolen!', emoji: '🕵️' },
       'Deal Breaker': { msg: 'Complete Set Stolen!', emoji: '💥' },
       'Forced Deal': { msg: 'Properties Swapped!', emoji: '🔄' },
