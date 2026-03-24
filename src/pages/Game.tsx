@@ -117,6 +117,7 @@ export default function Game() {
   const handRef = useRef<HTMLDivElement>(null);
   const movesChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const [gameNotifications, setGameNotifications] = useState<GameNotification[]>([]);
+  const [chatOpen, setChatOpen] = useState(false);
 
   // Helper to get player display name
   const getPlayerName = useCallback((pid: string) => {
@@ -762,7 +763,9 @@ export default function Game() {
   }
 
   return (
-    <div className="h-screen bg-background flex flex-col overflow-hidden">
+    <div className="h-screen bg-background flex overflow-hidden">
+    {/* Main game column */}
+    <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
       {/* Celebration Overlay */}
       {celebration && (
         <div className="fixed inset-0 z-[60] pointer-events-none flex items-center justify-center">
@@ -880,6 +883,15 @@ export default function Game() {
           </AlertDialog>
         </div>
         <div className="flex items-center gap-1 md:gap-2 text-sm flex-shrink-0">
+          <GameChat
+            roomId={roomId}
+            userId={userId}
+            playerName={getPlayerName(userId)}
+            players={players}
+            variant="topbar"
+            isOpen={chatOpen}
+            onToggle={() => setChatOpen(prev => !prev)}
+          />
           <Badge variant={isMyTurn ? 'default' : 'secondary'} className={`text-[9px] md:text-xs ${isMyTurn ? 'animate-pulse' : ''}`}>
             {isMyTurn ? "⭐ Your Turn" : `${currentPlayerName}'s Turn`}
           </Badge>
@@ -1283,7 +1295,7 @@ export default function Game() {
 
       {/* My hand */}
       {!discardMode && (
-        <div ref={handRef} className="flex-none border-t bg-card/90 backdrop-blur-sm px-2 md:px-3 py-1.5 md:py-2 shadow-inner max-h-[25vh] md:max-h-[35vh] overflow-y-auto">
+        <div ref={handRef} className="flex-none border-t bg-card/90 backdrop-blur-sm px-2 md:px-3 py-1.5 md:py-2 shadow-inner max-h-[30vh] md:max-h-[40vh] overflow-y-auto">
           <div className="flex items-center gap-1.5 md:gap-2 mb-1">
             <Hand className="w-3 h-3 text-muted-foreground" />
             <span className="text-[9px] md:text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
@@ -1308,13 +1320,29 @@ export default function Game() {
         </div>
       )}
 
-      {/* Game Chat */}
+      {/* Mobile floating chat */}
       <GameChat
         roomId={roomId}
         userId={userId}
         playerName={getPlayerName(userId)}
         players={players}
+        variant="floating"
+        isOpen={chatOpen}
+        onToggle={() => setChatOpen(prev => !prev)}
       />
+    </div>
+    {/* Desktop chat sidebar */}
+    {chatOpen && (
+      <GameChat
+        roomId={roomId}
+        userId={userId}
+        playerName={getPlayerName(userId)}
+        players={players}
+        variant="topbar"
+        isOpen={chatOpen}
+        onToggle={() => setChatOpen(prev => !prev)}
+      />
+    )}
     </div>
   );
 }

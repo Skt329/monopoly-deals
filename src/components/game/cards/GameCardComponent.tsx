@@ -13,18 +13,35 @@ interface GameCardComponentProps {
 }
 
 export function GameCardComponent({ card, onClick, selected, small }: GameCardComponentProps) {
-  switch (card.type) {
-    case 'property':
-      return <PropertyCard card={card} onClick={onClick} selected={selected} small={small} />;
-    case 'wild_property':
-      return <WildPropertyCard card={card} onClick={onClick} selected={selected} small={small} />;
-    case 'action':
-      return <ActionCard card={card} onClick={onClick} selected={selected} small={small} />;
-    case 'rent':
-      return <RentCard card={card} onClick={onClick} selected={selected} small={small} />;
-    case 'money':
-      return <MoneyCard card={card} onClick={onClick} selected={selected} small={small} />;
-    default:
-      return null;
+  const renderCard = () => {
+    switch (card.type) {
+      case 'property':
+        return <PropertyCard card={card} onClick={onClick} selected={selected} />;
+      case 'wild_property':
+        return <WildPropertyCard card={card} onClick={onClick} selected={selected} />;
+      case 'action':
+        return <ActionCard card={card} onClick={onClick} selected={selected} />;
+      case 'rent':
+        return <RentCard card={card} onClick={onClick} selected={selected} />;
+      case 'money':
+        return <MoneyCard card={card} onClick={onClick} selected={selected} />;
+      default:
+        return null;
+    }
+  };
+
+  if (small) {
+    return (
+      <div
+        className="flex-none"
+        style={{ width: 80, height: 116 }}
+      >
+        <div style={{ transform: 'scale(0.55)', transformOrigin: 'top left' }}>
+          {renderCard()}
+        </div>
+      </div>
+    );
   }
+
+  return renderCard();
 }
