@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -20,13 +20,13 @@ import {
   playActionCard,
   endTurn,
   needsDiscard,
-  discardCards,
   countCompleteSets,
   getBankTotal,
+  createEmptyBoard,
 } from '@/lib/gameEngine';
 import { GameCardComponent } from '@/components/game/cards/GameCardComponent';
 import { CardBack } from '@/components/game/cards/CardBack';
-import { DollarSign, Trophy, ChevronRight, Layers, Hand } from 'lucide-react';
+import { DollarSign, Trophy, ChevronRight, Layers, Hand, Sparkles } from 'lucide-react';
 
 interface Player {
   user_id: string;
@@ -44,6 +44,9 @@ export default function Game() {
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [roomId, setRoomId] = useState('');
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [dealing, setDealing] = useState(false);
+  const [dealtCards, setDealtCards] = useState<number>(0);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   // Initialize
   useEffect(() => {
@@ -73,54 +76,90 @@ export default function Game() {
         .select('current_state')
         .eq('room_id', room.id)
         .single();
-      if (stateData) setGameState(stateData.current_state as unknown as PublicGameState);
-
-      // Load hand
-      const { data: handData } = await supabase
-        .from('player_hands')
-        .select('hand')
-        .eq('room_id', room.id)
-        .eq('user_id', user.id)
-        .single();
-      if (handData) setMyHand(handData.hand as unknown as GameCard[]);
+      if (stateData) {
+        const state = stateData.current_state as unknown as PublicGameState;
+        setGameState(state);
+        
+        // Check if this is a fresh game (first load) - show deal animation
+        const handData = await supabase
+          .from('player_hands')
+          .select('hand')
+          .eq('room_id', room.id)
+          .eq('user_id', user.id)
+          .single();
+        
+        if (handData.data) {
+          const hand = handData.data.hand as unknown as GameCard[];
+          // If all players have starting hands and no cards played, show deal animation
+          const noCardsPlayed = Object.values(state.boards).every(
+            (b: PlayerBoard) => b.bank.length === 0 && Object.values(b.properties).every((p: GameCard[]) => p.length === 0)
+          );
+          
+          if (noCardsPlayed && hand.length > 0) {
+            setDealing(true);
+            setDealtCards(0);
+            // Animate dealing cards one by one
+            for (let i = 0; i < hand.length; i++) {
+              await new Promise(r => setTimeout(r, 200));
+              setDealtCards(i + 1);
+            }
+            await new Promise(r => setTimeout(r, 400));
+            setDealing(false);
+          }
+          setMyHand(hand);
+        }
+      }
     };
     init();
   }, [roomCode, navigate]);
 
-  // Subscribe to game state changes
+  // Subscribe to realtime game state changes
   useEffect(() => {
-    if (!roomId) return;
+    if (!roomId || !userId) return;
 
     const channel = supabase
-      .channel(`game-${roomId}`)
+      .channel(`game-realtime-${roomId}`)
       .on('postgres_changes', {
-        event: '*',
+        event: 'UPDATE',
         schema: 'public',
         table: 'game_states',
         filter: `room_id=eq.${roomId}`,
       }, (payload) => {
-        if (payload.new) {
-          setGameState((payload.new as any).current_state as PublicGameState);
+        if (payload.new && payload.new.current_state) {
+          setGameState(payload.new.current_state as unknown as PublicGameState);
         }
       })
       .on('postgres_changes', {
-        event: '*',
+        event: 'UPDATE',
         schema: 'public',
         table: 'player_hands',
-        filter: `room_id=eq.${roomId}`,
-      }, async () => {
-        // Reload own hand
-        const { data } = await supabase
-          .from('player_hands')
-          .select('hand')
-          .eq('room_id', roomId)
-          .eq('user_id', userId)
-          .single();
-        if (data) setMyHand(data.hand as unknown as GameCard[]);
+        filter: `user_id=eq.${userId}`,
+      }, (payload) => {
+        if (payload.new && payload.new.hand) {
+          setMyHand(payload.new.hand as unknown as GameCard[]);
+        }
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    channelRef.current = channel;
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [roomId, userId]);
+
+  // Poll for game state changes as backup (every 3s)
+  useEffect(() => {
+    if (!roomId || !userId) return;
+    const interval = setInterval(async () => {
+      const [stateRes, handRes] = await Promise.all([
+        supabase.from('game_states').select('current_state').eq('room_id', roomId).single(),
+        supabase.from('player_hands').select('hand').eq('room_id', roomId).eq('user_id', userId).single(),
+      ]);
+      if (stateRes.data) setGameState(stateRes.data.current_state as unknown as PublicGameState);
+      if (handRes.data) setMyHand(handRes.data.hand as unknown as GameCard[]);
+    }, 3000);
+    return () => clearInterval(interval);
   }, [roomId, userId]);
 
   const isMyTurn = gameState ? getCurrentPlayerId(gameState) === userId : false;
@@ -174,7 +213,6 @@ export default function Game() {
     const card = myHand.find(c => c.uid === selectedCard);
     if (!card) return;
 
-    // For now, play action without target selection (simplified)
     const result = playActionCard(gameState, myHand, selectedCard);
     if (!result) { toast.error('Cannot play this action'); return; }
     setSelectedCard(null);
@@ -200,11 +238,33 @@ export default function Game() {
   };
 
   const selectedCardData = selectedCard ? myHand.find(c => c.uid === selectedCard) : null;
+  const myBoard = gameState?.boards[userId] || createEmptyBoard();
 
   if (!gameState) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-muted-foreground">Loading game...</div>
+        <div className="flex flex-col items-center gap-3">
+          <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" />
+          <span className="text-muted-foreground">Loading game...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Dealing animation screen
+  if (dealing) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-6">
+        <Sparkles className="w-12 h-12 text-primary animate-pulse" />
+        <h2 className="text-2xl font-bold text-foreground">Dealing Cards...</h2>
+        <div className="flex gap-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className={`transition-all duration-300 ${i < dealtCards ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-8'}`}>
+              <CardBack />
+            </div>
+          ))}
+        </div>
+        <p className="text-muted-foreground text-sm">{dealtCards}/5 cards dealt</p>
       </div>
     );
   }
@@ -214,8 +274,8 @@ export default function Game() {
     const winnerName = players.find(p => p.user_id === gameState.winner)?.display_name || 'Unknown';
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-6">
-        <Trophy className="w-20 h-20 text-game-gold animate-coin-collect" />
-        <h1 className="text-4xl font-display font-bold text-foreground">{winnerName} Wins!</h1>
+        <Trophy className="w-20 h-20 text-yellow-500 animate-bounce" />
+        <h1 className="text-4xl font-bold text-foreground">{winnerName} Wins!</h1>
         <p className="text-muted-foreground">Completed 3 property sets</p>
         <Button onClick={() => navigate('/')} className="mt-4">Back to Home</Button>
       </div>
@@ -225,14 +285,14 @@ export default function Game() {
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b bg-card">
+      <div className="flex items-center justify-between px-4 py-2 border-b bg-card shadow-sm">
         <div className="flex items-center gap-3">
-          <h2 className="font-display font-bold text-foreground">MONOPOLY DEAL</h2>
-          <Badge variant="secondary" className="font-mono">{roomCode}</Badge>
+          <h2 className="font-bold text-foreground tracking-tight">MONOPOLY DEAL</h2>
+          <Badge variant="secondary" className="font-mono text-xs">{roomCode}</Badge>
         </div>
         <div className="flex items-center gap-3 text-sm">
-          <Badge variant={isMyTurn ? 'default' : 'secondary'}>
-            {isMyTurn ? "Your Turn" : `${currentPlayerName}'s Turn`}
+          <Badge variant={isMyTurn ? 'default' : 'secondary'} className={isMyTurn ? 'animate-pulse' : ''}>
+            {isMyTurn ? "⭐ Your Turn" : `${currentPlayerName}'s Turn`}
           </Badge>
           {isMyTurn && (
             <Badge variant="outline">
@@ -242,17 +302,17 @@ export default function Game() {
         </div>
       </div>
 
-      {/* Opponents area */}
-      <div className="flex-none flex gap-4 px-4 py-3 overflow-x-auto border-b">
+      {/* Opponents area - shows their played cards */}
+      <div className="flex-none flex gap-3 px-4 py-3 overflow-x-auto border-b bg-muted/30">
         {players.filter(p => p.user_id !== userId).map(player => {
-          const board = gameState.boards[player.user_id];
+          const board: PlayerBoard = gameState.boards[player.user_id] || createEmptyBoard();
           const handCount = gameState.handCounts[player.user_id] || 0;
           const isCurrentTurn = getCurrentPlayerId(gameState) === player.user_id;
 
           return (
             <div
               key={player.user_id}
-              className={`flex-none rounded-xl border-2 p-3 min-w-[200px] ${isCurrentTurn ? 'border-primary bg-primary/5' : 'border-border bg-card'}`}
+              className={`flex-none rounded-xl border-2 p-3 min-w-[240px] ${isCurrentTurn ? 'border-primary bg-primary/5' : 'border-border bg-card'}`}
             >
               <div className="flex items-center justify-between mb-2">
                 <span className="font-semibold text-sm text-foreground">{player.display_name}</span>
@@ -261,33 +321,48 @@ export default function Game() {
                     <Hand className="w-3 h-3" /> {handCount}
                   </span>
                   <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
-                    <DollarSign className="w-3 h-3" /> {board ? getBankTotal(board) : 0}M
+                    <DollarSign className="w-3 h-3" /> {getBankTotal(board)}M
                   </span>
                 </div>
               </div>
-              {/* Mini property display */}
-              {board && (
-                <div className="flex flex-wrap gap-1">
-                  {(Object.keys(board.properties) as PropertyColor[]).map(color => {
-                    const props = board.properties[color];
-                    if (props.length === 0) return null;
-                    const setSize = PROPERTY_SETS[color].size;
-                    const isComplete = props.length >= setSize;
-                    return (
-                      <div
-                        key={color}
-                        className={`${COLOR_CONFIG[color].bg} rounded px-1.5 py-0.5 text-[9px] font-bold ${COLOR_CONFIG[color].text} ${isComplete ? 'animate-set-complete ring-1 ring-game-gold' : ''}`}
-                      >
-                        {props.length}/{setSize}
+
+              {/* Opponent's played properties - visible to all */}
+              <div className="flex flex-wrap gap-1 mb-2">
+                {(Object.keys(board.properties) as PropertyColor[]).map(color => {
+                  const props = board.properties[color];
+                  if (!props || props.length === 0) return null;
+                  const setSize = PROPERTY_SETS[color].size;
+                  const isComplete = props.length >= setSize;
+                  return (
+                    <div
+                      key={color}
+                      className={`rounded-lg border p-1 ${isComplete ? 'border-yellow-400 shadow-md bg-yellow-50' : 'border-border'}`}
+                    >
+                      <div className="flex gap-0.5">
+                        {props.map(card => (
+                          <GameCardComponent key={card.uid} card={card} small />
+                        ))}
                       </div>
-                    );
-                  })}
+                      {isComplete && <span className="text-[7px] font-bold text-yellow-600 block text-center">✓ SET</span>}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Opponent's bank - visible */}
+              {board.bank.length > 0 && (
+                <div className="flex gap-0.5 flex-wrap">
+                  <span className="text-[8px] text-muted-foreground font-bold mr-1">Bank:</span>
+                  {board.bank.map(card => (
+                    <GameCardComponent key={card.uid} card={card} small />
+                  ))}
                 </div>
               )}
-              {/* Card backs for hidden hand */}
+
+              {/* Hidden hand - card backs */}
               <div className="flex gap-0.5 mt-2">
                 {Array.from({ length: Math.min(handCount, 7) }).map((_, i) => (
-                  <CardBack key={i} small className="scale-[0.5] -mx-2" />
+                  <CardBack key={i} small className="scale-[0.5] -mx-1.5" />
                 ))}
               </div>
             </div>
@@ -298,22 +373,22 @@ export default function Game() {
       {/* Center area - Board & Deck */}
       <div className="flex-1 flex items-center justify-center gap-8 px-4 overflow-auto">
         {/* My properties */}
-        <div className="flex flex-col gap-2 max-w-[400px]">
+        <div className="flex flex-col gap-2 max-w-[450px]">
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Your Properties</h3>
           <div className="flex flex-wrap gap-2">
-            {(Object.keys(gameState.boards[userId]?.properties || {}) as PropertyColor[]).map(color => {
-              const props = (gameState.boards[userId]?.properties[color] || []);
+            {(Object.keys(myBoard.properties) as PropertyColor[]).map(color => {
+              const props = myBoard.properties[color] || [];
               if (props.length === 0) return null;
               const setSize = PROPERTY_SETS[color].size;
               const isComplete = props.length >= setSize;
               return (
-                <div key={color} className={`rounded-lg p-2 border ${isComplete ? 'border-game-gold shadow-md animate-set-complete' : 'border-border'}`}>
+                <div key={color} className={`rounded-lg p-2 border ${isComplete ? 'border-yellow-400 shadow-lg bg-yellow-50 animate-set-complete' : 'border-border'}`}>
                   <div className="flex gap-1 mb-1">
                     {props.map(card => (
                       <GameCardComponent key={card.uid} card={card} small />
                     ))}
                   </div>
-                  {isComplete && <Badge className="text-[8px] bg-game-gold text-game-gold-foreground">COMPLETE</Badge>}
+                  {isComplete && <Badge className="text-[8px] bg-yellow-400 text-yellow-900">COMPLETE</Badge>}
                 </div>
               );
             })}
@@ -321,10 +396,10 @@ export default function Game() {
           {/* Bank */}
           <div className="mt-2">
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-              Bank: {getBankTotal(gameState.boards[userId] || { bank: [], properties: {} as any, hasHouse: {} as any, hasHotel: {} as any })}M
+              Bank: {getBankTotal(myBoard)}M
             </h3>
             <div className="flex gap-1 flex-wrap">
-              {(gameState.boards[userId]?.bank || []).map(card => (
+              {myBoard.bank.map(card => (
                 <GameCardComponent key={card.uid} card={card} small />
               ))}
             </div>
@@ -338,12 +413,12 @@ export default function Game() {
             <p className="text-[10px] text-muted-foreground mt-1">Draw Pile</p>
           </div>
           {isMyTurn && gameState.phase === 'drawing' && (
-            <Button onClick={handleDraw} className="gap-1 text-sm">
+            <Button onClick={handleDraw} className="gap-1 text-sm animate-pulse">
               Draw Cards
             </Button>
           )}
           <div className="text-center">
-            <div className="w-20 h-28 rounded-xl border-2 border-dashed border-border flex items-center justify-center">
+            <div className="w-20 h-28 rounded-xl border-2 border-dashed border-border flex items-center justify-center bg-muted/20">
               {gameState.discardPile.length > 0 ? (
                 <GameCardComponent card={gameState.discardPile[gameState.discardPile.length - 1]} small />
               ) : (
@@ -357,8 +432,8 @@ export default function Game() {
         {/* Sets counter */}
         <div className="flex flex-col items-center gap-2">
           <div className="text-center">
-            <p className="text-4xl font-display font-bold text-foreground">
-              {gameState.boards[userId] ? countCompleteSets(gameState.boards[userId]) : 0}
+            <p className="text-4xl font-bold text-foreground">
+              {countCompleteSets(myBoard)}
             </p>
             <p className="text-xs text-muted-foreground">/ 3 Sets</p>
           </div>
@@ -372,7 +447,7 @@ export default function Game() {
 
       {/* Action bar for selected card */}
       {selectedCardData && isMyTurn && gameState.phase === 'playing' && (
-        <div className="flex-none px-4 py-2 border-t bg-card flex items-center justify-center gap-3 animate-card-draw">
+        <div className="flex-none px-4 py-2 border-t bg-card flex items-center justify-center gap-3 shadow-lg">
           <span className="text-sm text-muted-foreground font-medium">{selectedCardData.name}</span>
 
           {(selectedCardData.type === 'property') && (
@@ -408,13 +483,13 @@ export default function Game() {
           )}
 
           <Button size="sm" variant="secondary" onClick={handlePlayAsMoney}>
-            Play as Money ({selectedCardData.value}M)
+            Play as Money (M{selectedCardData.value})
           </Button>
         </div>
       )}
 
       {/* My hand */}
-      <div className="flex-none border-t bg-card/80 backdrop-blur-sm px-4 py-3">
+      <div className="flex-none border-t bg-card/90 backdrop-blur-sm px-4 py-3 shadow-inner">
         <div className="flex items-center gap-2 mb-2">
           <Hand className="w-4 h-4 text-muted-foreground" />
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -422,8 +497,8 @@ export default function Game() {
           </span>
         </div>
         <div className="flex gap-2 overflow-x-auto pb-2 justify-center">
-          {myHand.map(card => (
-            <div key={card.uid} className="flex-none animate-card-draw">
+          {myHand.map((card, i) => (
+            <div key={card.uid} className="flex-none" style={{ animationDelay: `${i * 50}ms` }}>
               <GameCardComponent
                 card={card}
                 onClick={() => handleCardClick(card.uid)}
