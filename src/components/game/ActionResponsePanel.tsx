@@ -46,6 +46,22 @@ export function ActionResponsePanel({
   const isPaymentAction = ['rent', 'birthday', 'debt_collector'].includes(pending.type);
   const isStealAction = ['deal_breaker', 'sly_deal', 'forced_deal'].includes(pending.type);
 
+  // Calculate total assets for smart payment
+  const totalAssets = myBoard.bank.reduce((sum, c) => sum + c.value, 0) +
+    (Object.keys(myBoard.properties) as PropertyColor[]).reduce((sum, color) => {
+      return sum + (myBoard.properties[color]?.reduce((s, c) => s + c.value, 0) || 0);
+    }, 0);
+  const cantAfford = totalAssets <= amountOwed;
+
+  // Collect all card uids for "Pay Everything"
+  const allBankUids = myBoard.bank.map(c => c.uid);
+  const allPropCards: { uid: string; color: PropertyColor }[] = [];
+  for (const color of Object.keys(myBoard.properties) as PropertyColor[]) {
+    for (const card of myBoard.properties[color] || []) {
+      allPropCards.push({ uid: card.uid, color });
+    }
+  }
+
   const toggleBankCard = (uid: string) => {
     setSelectedBankCards(prev => prev.includes(uid) ? prev.filter(id => id !== uid) : [...prev, uid]);
   };
@@ -127,10 +143,20 @@ export function ActionResponsePanel({
 
         {/* Action buttons */}
         <div className="flex gap-3 mt-6">
-          {isPaymentAction && (
+          {isPaymentAction && cantAfford && (
+            <Button
+              onClick={() => onPay(allBankUids, allPropCards)}
+              className="flex-1 gap-2"
+            >
+              <CreditCard className="w-4 h-4" />
+              Pay Everything (M{totalAssets})
+            </Button>
+          )}
+
+          {isPaymentAction && !cantAfford && (
             <Button
               onClick={() => onPay(selectedBankCards, selectedProps)}
-              disabled={totalSelected < amountOwed && (myBoard.bank.length > 0 || Object.values(myBoard.properties).some(p => p.length > 0))}
+              disabled={totalSelected < amountOwed}
               className="flex-1 gap-2"
             >
               <CreditCard className="w-4 h-4" />
