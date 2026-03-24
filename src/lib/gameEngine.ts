@@ -16,24 +16,24 @@ import {
 // ═══════════════════════════════════════════
 
 export interface PlayerBoard {
-  properties: Record<PropertyColor, GameCard[]>; // played properties grouped by color
-  bank: GameCard[]; // money cards in bank
+  properties: Record<PropertyColor, GameCard[]>;
+  bank: GameCard[];
   hasHouse: Record<PropertyColor, boolean>;
   hasHotel: Record<PropertyColor, boolean>;
 }
 
 export interface PublicGameState {
   roomId: string;
-  deck: GameCard[]; // only host should see full deck; clients see count
+  deck: GameCard[];
   discardPile: GameCard[];
-  boards: Record<string, PlayerBoard>; // keyed by playerId
+  boards: Record<string, PlayerBoard>;
   currentPlayerIndex: number;
-  playerOrder: string[]; // player IDs in turn order
+  playerOrder: string[];
   cardsPlayedThisTurn: number;
   phase: GamePhase;
   pendingAction: PendingAction | null;
   winner: string | null;
-  handCounts: Record<string, number>; // for opponent hand count display
+  handCounts: Record<string, number>;
 }
 
 export type GamePhase =
@@ -41,8 +41,8 @@ export type GamePhase =
   | 'drawing'
   | 'playing'
   | 'discard'
-  | 'responding' // waiting for target to respond to action
-  | 'paying'     // target choosing payment
+  | 'responding'
+  | 'paying'
   | 'finished';
 
 export interface PendingAction {
@@ -53,6 +53,9 @@ export interface PendingAction {
   respondedPlayers: string[];
   cardPlayed: GameCard;
   doubleRent?: boolean;
+  targetColor?: PropertyColor;
+  targetCardUid?: string;
+  sourceCardUid?: string;
 }
 
 // ═══════════════════════════════════════════
@@ -123,7 +126,6 @@ export function drawCards(
   const drawn = state.deck.slice(0, drawCount);
   const newDeck = state.deck.slice(drawCount);
 
-  // If deck is empty, shuffle discard pile
   if (newDeck.length === 0 && state.discardPile.length > 0) {
     const reshuffled = shuffleDeck([...state.discardPile]);
     return {
@@ -181,7 +183,6 @@ export function playCardAsProperty(
     handCounts: { ...state.handCounts, [playerId]: newHand.length },
   };
 
-  // Check win condition
   const completeSets = countCompleteSets(newBoard);
   if (completeSets >= COMPLETE_SETS_TO_WIN) {
     newState.winner = playerId;
@@ -221,7 +222,10 @@ export function playActionCard(
   hand: GameCard[],
   cardUid: string,
   targetPlayerId?: string,
-  targetColor?: PropertyColor
+  targetColor?: PropertyColor,
+  targetCardUid?: string,
+  sourceCardUid?: string,
+  doubleRent?: boolean
 ): { state: PublicGameState; hand: GameCard[] } | null {
   const playerId = getCurrentPlayerId(state);
   const cardIndex = hand.findIndex(c => c.uid === cardUid);
@@ -240,7 +244,6 @@ export function playActionCard(
 
   switch (card.name) {
     case 'Pass Go': {
-      // Draw 2 extra cards
       const drawn = newState.deck.slice(0, 2);
       newState = {
         ...newState,
@@ -295,13 +298,14 @@ export function playActionCard(
           targetPlayerIds: [targetPlayerId],
           respondedPlayers: [],
           cardPlayed: card,
+          targetColor,
         },
       };
       return { state: newState, hand: newHand };
     }
 
     case 'Sly Deal': {
-      if (!targetPlayerId) return null;
+      if (!targetPlayerId || !targetCardUid) return null;
       newState = {
         ...newState,
         phase: 'responding',
@@ -311,13 +315,14 @@ export function playActionCard(
           targetPlayerIds: [targetPlayerId],
           respondedPlayers: [],
           cardPlayed: card,
+          targetCardUid,
         },
       };
       return { state: newState, hand: newHand };
     }
 
     case 'Forced Deal': {
-      if (!targetPlayerId) return null;
+      if (!targetPlayerId || !targetCardUid || !sourceCardUid) return null;
       newState = {
         ...newState,
         phase: 'responding',
@@ -327,6 +332,8 @@ export function playActionCard(
           targetPlayerIds: [targetPlayerId],
           respondedPlayers: [],
           cardPlayed: card,
+          targetCardUid,
+          sourceCardUid,
         },
       };
       return { state: newState, hand: newHand };
@@ -335,7 +342,8 @@ export function playActionCard(
     case 'Rent':
     case 'Wild Rent': {
       if (!targetColor) return null;
-      const rentAmount = calculateRent(state.boards[playerId], targetColor);
+      let rentAmount = calculateRent(state.boards[playerId], targetColor);
+      if (doubleRent) rentAmount *= 2;
       const targets = card.name === 'Wild Rent' && targetPlayerId
         ? [targetPlayerId]
         : state.playerOrder.filter(id => id !== playerId);
@@ -350,6 +358,8 @@ export function playActionCard(
           amountOwed: rentAmount,
           respondedPlayers: [],
           cardPlayed: card,
+          doubleRent,
+          targetColor,
         },
       };
       return { state: newState, hand: newHand };
@@ -377,13 +387,126 @@ export function playActionCard(
     }
 
     case 'Double The Rent': {
-      // This should be played with a rent card — handled in UI
+      // Handled as combo in Game.tsx - just discard
       return { state: newState, hand: newHand };
     }
 
     default:
       return { state: newState, hand: newHand };
   }
+}
+
+// ═══════════════════════════════════════════
+// STEAL / TRANSFER RESOLUTION
+// ═══════════════════════════════════════════
+
+/** Find which color group a card belongs to on a board */
+function findCardColor(board: PlayerBoard, cardUid: string): PropertyColor | null {
+  for (const color of Object.keys(board.properties) as PropertyColor[]) {
+    if (board.properties[color].some(c => c.uid === cardUid)) return color;
+  }
+  return null;
+}
+
+/** Remove a single property card from a board, returns the card or null */
+function removePropertyCard(board: PlayerBoard, cardUid: string): { board: PlayerBoard; card: GameCard | null; color: PropertyColor | null } {
+  const color = findCardColor(board, cardUid);
+  if (!color) return { board, card: null, color: null };
+  const card = board.properties[color].find(c => c.uid === cardUid) || null;
+  return {
+    board: {
+      ...board,
+      properties: {
+        ...board.properties,
+        [color]: board.properties[color].filter(c => c.uid !== cardUid),
+      },
+    },
+    card,
+    color,
+  };
+}
+
+/** Add a property card to a board under the given color */
+function addPropertyCard(board: PlayerBoard, card: GameCard, color: PropertyColor): PlayerBoard {
+  return {
+    ...board,
+    properties: {
+      ...board.properties,
+      [color]: [...board.properties[color], card],
+    },
+  };
+}
+
+export function resolveStealAction(
+  state: PublicGameState,
+  pending: PendingAction,
+  targetId: string
+): PublicGameState {
+  const sourceId = pending.sourcePlayerId;
+  let sourceBoard = { ...state.boards[sourceId] };
+  let targetBoard = { ...state.boards[targetId] };
+
+  switch (pending.type) {
+    case 'sly_deal': {
+      if (!pending.targetCardUid) break;
+      const removed = removePropertyCard(targetBoard, pending.targetCardUid);
+      if (!removed.card || !removed.color) break;
+      targetBoard = removed.board;
+      const destColor = removed.card.chosenColor || removed.card.color || removed.color;
+      sourceBoard = addPropertyCard(sourceBoard, removed.card, destColor);
+      break;
+    }
+
+    case 'forced_deal': {
+      if (!pending.targetCardUid || !pending.sourceCardUid) break;
+      // Remove target's card
+      const removedTarget = removePropertyCard(targetBoard, pending.targetCardUid);
+      if (!removedTarget.card || !removedTarget.color) break;
+      targetBoard = removedTarget.board;
+      // Remove source's card
+      const removedSource = removePropertyCard(sourceBoard, pending.sourceCardUid);
+      if (!removedSource.card || !removedSource.color) break;
+      sourceBoard = removedSource.board;
+      // Swap
+      const targetDestColor = removedTarget.card.chosenColor || removedTarget.card.color || removedTarget.color;
+      const sourceDestColor = removedSource.card.chosenColor || removedSource.card.color || removedSource.color;
+      sourceBoard = addPropertyCard(sourceBoard, removedTarget.card, targetDestColor);
+      targetBoard = addPropertyCard(targetBoard, removedSource.card, sourceDestColor);
+      break;
+    }
+
+    case 'deal_breaker': {
+      if (!pending.targetColor) break;
+      const color = pending.targetColor;
+      const stolenCards = [...targetBoard.properties[color]];
+      if (stolenCards.length === 0) break;
+      targetBoard = {
+        ...targetBoard,
+        properties: { ...targetBoard.properties, [color]: [] },
+        hasHouse: { ...targetBoard.hasHouse, [color]: false },
+        hasHotel: { ...targetBoard.hasHotel, [color]: false },
+      };
+      sourceBoard = {
+        ...sourceBoard,
+        properties: {
+          ...sourceBoard.properties,
+          [color]: [...sourceBoard.properties[color], ...stolenCards],
+        },
+        hasHouse: { ...sourceBoard.hasHouse, [color]: targetBoard.hasHouse[color] || false },
+        hasHotel: { ...sourceBoard.hasHotel, [color]: targetBoard.hasHotel[color] || false },
+      };
+      break;
+    }
+  }
+
+  return {
+    ...state,
+    boards: {
+      ...state.boards,
+      [sourceId]: sourceBoard,
+      [targetId]: targetBoard,
+    },
+  };
 }
 
 // ═══════════════════════════════════════════
@@ -439,7 +562,6 @@ export function discardCards(
   const newHand = hand.filter(c => !cardUids.includes(c.uid));
 
   if (newHand.length <= MAX_HAND_SIZE) {
-    // Done discarding — end the turn and move to next player
     const nextIndex = (state.currentPlayerIndex + 1) % state.playerOrder.length;
     return {
       state: {
@@ -455,7 +577,6 @@ export function discardCards(
     };
   }
 
-  // Still need to discard more
   return {
     state: {
       ...state,
@@ -481,7 +602,6 @@ export function payWithCards(
   let newPayerBoard = { ...payerBoard };
   const payments: GameCard[] = [];
 
-  // Remove bank cards
   for (const uid of cardUids) {
     const idx = newPayerBoard.bank.findIndex(c => c.uid === uid);
     if (idx !== -1) {
@@ -490,7 +610,6 @@ export function payWithCards(
     }
   }
 
-  // Remove property cards
   for (const { uid, color } of propertyCards) {
     const idx = newPayerBoard.properties[color].findIndex(c => c.uid === uid);
     if (idx !== -1) {
@@ -502,7 +621,6 @@ export function payWithCards(
     }
   }
 
-  // Add to collector's bank
   const collectorBoard = { ...state.boards[collectorId] };
   collectorBoard.bank = [...collectorBoard.bank, ...payments];
 
@@ -520,4 +638,29 @@ export function payWithCards(
       },
     },
   };
+}
+
+/** Check if a color set is complete for a given board */
+export function isSetComplete(board: PlayerBoard, color: PropertyColor): boolean {
+  return board.properties[color].length >= PROPERTY_SETS[color].size;
+}
+
+/** Get all non-complete-set property cards from a board (for Sly Deal targeting) */
+export function getStealableProperties(board: PlayerBoard): { card: GameCard; color: PropertyColor }[] {
+  const result: { card: GameCard; color: PropertyColor }[] = [];
+  for (const color of Object.keys(board.properties) as PropertyColor[]) {
+    if (!isSetComplete(board, color)) {
+      for (const card of board.properties[color]) {
+        result.push({ card, color });
+      }
+    }
+  }
+  return result;
+}
+
+/** Get complete set colors from a board (for Deal Breaker targeting) */
+export function getCompleteSetColors(board: PlayerBoard): PropertyColor[] {
+  return (Object.keys(board.properties) as PropertyColor[]).filter(
+    color => isSetComplete(board, color)
+  );
 }
