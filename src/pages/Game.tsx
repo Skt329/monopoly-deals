@@ -492,8 +492,12 @@ export default function Game() {
   }, [gameState, myHand, discardSelected, persistState]);
 
   const handleCardClick = (uid: string) => {
-    if (!isMyTurn || gameState?.phase !== 'playing') return;
-    setSelectedCard(prev => prev === uid ? null : uid);
+    if (discardMode) return; // handled by discard toggle
+    const card = myHand.find(c => c.uid === uid);
+    if (!card) return;
+    // Open preview dialog with card details + action buttons
+    setPreviewCard(card);
+    setSelectedCard(uid);
     setShowColorPicker(false);
   };
 
