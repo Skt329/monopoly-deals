@@ -649,6 +649,18 @@ export default function Game() {
 
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden">
+      {/* Celebration Overlay */}
+      {celebration && (
+        <div className="fixed inset-0 z-[60] pointer-events-none flex items-center justify-center">
+          <div className="animate-scale-in bg-card/95 backdrop-blur-md border-2 border-primary rounded-2xl shadow-2xl px-8 py-6 text-center max-w-sm">
+            <div className="text-5xl mb-2 animate-bounce">{celebration.emoji}</div>
+            <h2 className="text-xl font-black text-foreground mb-1">{celebration.message}</h2>
+            <div className="h-1 bg-primary/30 rounded-full overflow-hidden mt-3">
+              <div className="h-full bg-primary rounded-full animate-[shrink_2.5s_linear_forwards]" />
+            </div>
+          </div>
+        </div>
+      )}
       {/* Action Response Panel */}
       {gameState.phase === 'responding' && gameState.pendingAction && (
         <ActionResponsePanel
