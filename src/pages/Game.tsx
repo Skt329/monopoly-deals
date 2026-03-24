@@ -763,7 +763,9 @@ export default function Game() {
   }
 
   return (
-    <div className="h-screen bg-background flex flex-col overflow-hidden">
+    <div className="h-screen bg-background flex overflow-hidden">
+    {/* Main game column */}
+    <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
       {/* Celebration Overlay */}
       {celebration && (
         <div className="fixed inset-0 z-[60] pointer-events-none flex items-center justify-center">
