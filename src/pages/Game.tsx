@@ -772,81 +772,104 @@ export default function Game() {
         </div>
       </div>
 
-      {/* Action bar for selected card */}
-      {selectedCardData && isMyTurn && gameState.phase === 'playing' && (
-        <div className="flex-none px-4 py-2 border-t bg-card flex items-center justify-center gap-3 shadow-lg">
-          <span className="text-sm text-muted-foreground font-medium">{selectedCardData.name}</span>
+      {/* Card Preview Dialog */}
+      <Dialog open={!!previewCard} onOpenChange={(open) => { if (!open) { setPreviewCard(null); setSelectedCard(null); setShowColorPicker(false); } }}>
+        <DialogContent className="max-w-xs p-4">
+          <DialogHeader>
+            <DialogTitle className="text-center">{previewCard?.name}</DialogTitle>
+          </DialogHeader>
+          {previewCard && (
+            <div className="flex flex-col items-center gap-4">
+              {/* Enlarged card */}
+              <div className="transform scale-150 origin-center my-4">
+                <GameCardComponent card={previewCard} />
+              </div>
+              <p className="text-xs text-muted-foreground text-center">
+                Type: {previewCard.type} · Value: M{previewCard.value}
+                {previewCard.type === 'property' && previewCard.color && ` · ${COLOR_CONFIG[previewCard.color].label}`}
+              </p>
 
-          {/* Money cards: only Play to Bank */}
-          {selectedCardData.type === 'money' && (
-            <Button size="sm" onClick={handlePlayAsMoney}>
-              Play to Bank (M{selectedCardData.value})
-            </Button>
-          )}
+              {/* Action buttons inside dialog — only show on your turn during playing phase */}
+              {isMyTurn && gameState.phase === 'playing' && (
+                <div className="flex flex-col gap-2 w-full">
+                  {/* Money cards: only Play to Bank */}
+                  {previewCard.type === 'money' && (
+                    <Button size="sm" className="w-full" onClick={() => { setPreviewCard(null); handlePlayAsMoney(); }}>
+                      Play to Bank (M{previewCard.value})
+                    </Button>
+                  )}
 
-          {/* Property cards: only Play as Property */}
-          {selectedCardData.type === 'property' && (
-            <Button size="sm" onClick={() => handlePlayAsProperty(selectedCardData.color!)}>
-              Play as Property
-            </Button>
-          )}
+                  {/* Property cards: only Play as Property */}
+                  {previewCard.type === 'property' && (
+                    <Button size="sm" className="w-full" onClick={() => { setPreviewCard(null); handlePlayAsProperty(previewCard.color!); }}>
+                      Play as Property
+                    </Button>
+                  )}
 
-          {/* Wild Property: Play as Property (with color picker) OR Play as Money */}
-          {selectedCardData.type === 'wild_property' && (
-            <>
-              <Button size="sm" variant="outline" onClick={() => setShowColorPicker(!showColorPicker)}>
-                Play as Property
-              </Button>
-              {showColorPicker && (
-                <div className="flex gap-1">
-                  {selectedCardData.colors?.map(color => (
-                    <button
-                      key={color}
-                      onClick={() => handlePlayAsProperty(color)}
-                      className={`${COLOR_CONFIG[color].bg} w-6 h-6 rounded-full border-2 border-background hover:scale-110 transition-transform`}
-                      title={COLOR_CONFIG[color].label}
-                    />
-                  ))}
+                  {/* Wild Property */}
+                  {previewCard.type === 'wild_property' && (
+                    <>
+                      <div className="flex flex-col gap-1">
+                        <Button size="sm" variant="outline" className="w-full" onClick={() => setShowColorPicker(!showColorPicker)}>
+                          Play as Property
+                        </Button>
+                        {showColorPicker && (
+                          <div className="flex gap-1 justify-center">
+                            {previewCard.colors?.map(color => (
+                              <button
+                                key={color}
+                                onClick={() => { setPreviewCard(null); handlePlayAsProperty(color); }}
+                                className={`${COLOR_CONFIG[color].bg} w-8 h-8 rounded-full border-2 border-background hover:scale-110 transition-transform`}
+                                title={COLOR_CONFIG[color].label}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <Button size="sm" variant="secondary" className="w-full" onClick={() => { setPreviewCard(null); handlePlayAsMoney(); }}>
+                        Play as Money (M{previewCard.value})
+                      </Button>
+                    </>
+                  )}
+
+                  {/* Action cards: Play Action OR Play as Money — but NOT for Just Say No */}
+                  {previewCard.type === 'action' && !doubleRentPending && (
+                    <>
+                      {previewCard.name !== 'Just Say No' && (
+                        <Button size="sm" className="w-full" onClick={() => { setPreviewCard(null); handlePlayAction(); }}>
+                          Play Action
+                        </Button>
+                      )}
+                      <Button size="sm" variant="secondary" className="w-full" onClick={() => { setPreviewCard(null); handlePlayAsMoney(); }}>
+                        Play as Money (M{previewCard.value})
+                      </Button>
+                    </>
+                  )}
+
+                  {/* Rent cards */}
+                  {previewCard.type === 'rent' && !doubleRentPending && (
+                    <>
+                      <Button size="sm" className="w-full" onClick={() => { setPreviewCard(null); handlePlayAction(); }}>
+                        Play Rent
+                      </Button>
+                      <Button size="sm" variant="secondary" className="w-full" onClick={() => { setPreviewCard(null); handlePlayAsMoney(); }}>
+                        Play as Money (M{previewCard.value})
+                      </Button>
+                    </>
+                  )}
+
+                  {/* Double Rent combo */}
+                  {doubleRentPending && previewCard.type === 'rent' && (
+                    <Button size="sm" variant="destructive" className="w-full" onClick={() => { setPreviewCard(null); handlePlayRentWithDouble(); }}>
+                      🔥 Play with Double Rent!
+                    </Button>
+                  )}
                 </div>
               )}
-              <Button size="sm" variant="secondary" onClick={handlePlayAsMoney}>
-                Play as Money (M{selectedCardData.value})
-              </Button>
-            </>
+            </div>
           )}
-
-          {/* Action cards: Play Action OR Play as Money */}
-          {selectedCardData.type === 'action' && !doubleRentPending && (
-            <>
-              <Button size="sm" onClick={handlePlayAction}>
-                Play Action
-              </Button>
-              <Button size="sm" variant="secondary" onClick={handlePlayAsMoney}>
-                Play as Money (M{selectedCardData.value})
-              </Button>
-            </>
-          )}
-
-          {/* Rent cards: Play Action OR Play as Money (or Double Rent combo) */}
-          {selectedCardData.type === 'rent' && !doubleRentPending && (
-            <>
-              <Button size="sm" onClick={handlePlayAction}>
-                Play Rent
-              </Button>
-              <Button size="sm" variant="secondary" onClick={handlePlayAsMoney}>
-                Play as Money (M{selectedCardData.value})
-              </Button>
-            </>
-          )}
-
-          {/* When Double Rent is active and user picks a rent card */}
-          {doubleRentPending && selectedCardData.type === 'rent' && (
-            <Button size="sm" variant="destructive" onClick={handlePlayRentWithDouble}>
-              🔥 Play with Double Rent!
-            </Button>
-          )}
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {/* Discard overlay */}
       {discardMode && (
