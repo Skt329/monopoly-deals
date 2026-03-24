@@ -117,6 +117,7 @@ export default function Game() {
   const handRef = useRef<HTMLDivElement>(null);
   const movesChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const [gameNotifications, setGameNotifications] = useState<GameNotification[]>([]);
+  const [chatOpen, setChatOpen] = useState(false);
 
   // Helper to get player display name
   const getPlayerName = useCallback((pid: string) => {
