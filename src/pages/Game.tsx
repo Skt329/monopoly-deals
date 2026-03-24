@@ -97,13 +97,21 @@ export default function Game() {
   const [discardSelected, setDiscardSelected] = useState<string[]>([]);
   const [doubleRentPending, setDoubleRentPending] = useState(false);
   const [doubleRentCardUid, setDoubleRentCardUid] = useState<string | null>(null);
-  // Rearrange wild property state
   const [rearrangeCardUid, setRearrangeCardUid] = useState<string | null>(null);
   const [rearrangeCard, setRearrangeCard] = useState<GameCard | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const forceEndRef = useRef(false);
   const [expandedOpponent, setExpandedOpponent] = useState<string | null>(null);
   const [celebration, setCelebration] = useState<{ type: string; message: string; emoji: string } | null>(null);
+  const [flyingCards, setFlyingCards] = useState<FlyingCard[]>([]);
+  const deckRef = useRef<HTMLDivElement>(null);
+  const handRef = useRef<HTMLDivElement>(null);
+  const movesChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  // Helper to get player display name
+  const getPlayerName = useCallback((pid: string) => {
+    return players.find(p => p.user_id === pid)?.display_name || 'Unknown';
+  }, [players]);
 
   // Initialize
   useEffect(() => {
