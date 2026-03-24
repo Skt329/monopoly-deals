@@ -235,9 +235,11 @@ export function playActionCard(
   if (card.type !== 'action' && card.type !== 'rent') return null;
 
   const newHand = hand.filter((_, i) => i !== cardIndex);
+  // Don't blanket-discard; House/Hotel stay on the board
+  const shouldDiscard = card.name !== 'House' && card.name !== 'Hotel';
   let newState: PublicGameState = {
     ...state,
-    discardPile: [...state.discardPile, card],
+    discardPile: shouldDiscard ? [...state.discardPile, card] : state.discardPile,
     cardsPlayedThisTurn: state.cardsPlayedThisTurn + 1,
     handCounts: { ...state.handCounts, [playerId]: newHand.length },
   };
@@ -371,7 +373,14 @@ export function playActionCard(
       const setSize = PROPERTY_SETS[targetColor].size;
       if (board.properties[targetColor].length < setSize) return null;
 
-      const newBoard = { ...board, hasHouse: { ...board.hasHouse, [targetColor]: true } };
+      const newBoard = {
+        ...board,
+        hasHouse: { ...board.hasHouse, [targetColor]: true },
+        properties: {
+          ...board.properties,
+          [targetColor]: [...board.properties[targetColor], { ...card, chosenColor: targetColor }],
+        },
+      };
       newState = { ...newState, boards: { ...newState.boards, [playerId]: newBoard } };
       return { state: newState, hand: newHand };
     }
@@ -381,7 +390,14 @@ export function playActionCard(
       const board = state.boards[playerId];
       if (!board.hasHouse[targetColor]) return null;
 
-      const newBoard = { ...board, hasHotel: { ...board.hasHotel, [targetColor]: true } };
+      const newBoard = {
+        ...board,
+        hasHotel: { ...board.hasHotel, [targetColor]: true },
+        properties: {
+          ...board.properties,
+          [targetColor]: [...board.properties[targetColor], { ...card, chosenColor: targetColor }],
+        },
+      };
       newState = { ...newState, boards: { ...newState.boards, [playerId]: newBoard } };
       return { state: newState, hand: newHand };
     }
@@ -624,7 +640,16 @@ export function payWithCards(
   }
 
   const collectorBoard = { ...state.boards[collectorId] };
-  collectorBoard.bank = [...collectorBoard.bank, ...payments];
+  // Route property cards to property pile, money/action to bank
+  const moneyPayments = payments.filter(c => c.type !== 'property' && c.type !== 'wild_property');
+  const propertyPayments = payments.filter(c => c.type === 'property' || c.type === 'wild_property');
+  collectorBoard.bank = [...collectorBoard.bank, ...moneyPayments];
+  // Add property payments to collector's property pile
+  collectorBoard.properties = { ...collectorBoard.properties };
+  for (const propCard of propertyPayments) {
+    const destColor = propCard.chosenColor || propCard.color || 'brown';
+    collectorBoard.properties[destColor] = [...(collectorBoard.properties[destColor] || []), propCard];
+  }
 
   const payerId = Object.keys(state.boards).find(
     id => state.boards[id] === payerBoard

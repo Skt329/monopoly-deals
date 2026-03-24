@@ -19,13 +19,14 @@ interface TargetSelectorProps {
   onConfirm: () => void;
   onCancel: () => void;
   availableColors?: PropertyColor[];
+  currentPlayerBoard?: PlayerBoard;
 }
 
 export function TargetSelector({
   players, userId, boards, actionType, selectedTarget, selectedColor,
   selectedTargetCard, selectedSourceCard,
   onSelectTarget, onSelectColor, onSelectTargetCard, onSelectSourceCard,
-  onConfirm, onCancel, availableColors
+  onConfirm, onCancel, availableColors, currentPlayerBoard
 }: TargetSelectorProps) {
   const opponents = players.filter(p => p.user_id !== userId);
   const needsTarget = ['Debt Collector', 'Sly Deal', 'Forced Deal', 'Deal Breaker', 'Wild Rent'].includes(actionType);
@@ -208,27 +209,46 @@ export function TargetSelector({
           </>
         )}
 
-        {/* Color selection for rent */}
+        {/* Color selection for rent - filter to colors player owns */}
         {needsColor && (
           <div className="mb-4">
             <p className="text-sm font-semibold text-muted-foreground mb-2">Choose a color:</p>
             <div className="flex flex-wrap gap-2">
-              {(availableColors || (Object.keys(PROPERTY_SETS) as PropertyColor[])).map(color => {
-                const config = COLOR_CONFIG[color];
-                return (
-                  <button
-                    key={color}
-                    onClick={() => onSelectColor(color)}
-                    className={`px-3 py-2 rounded-lg border-2 text-xs font-bold transition-all ${
-                      selectedColor === color
-                        ? 'border-primary ring-2 ring-primary scale-105'
-                        : 'border-border hover:scale-105'
-                    } ${config.bg} ${config.text}`}
-                  >
-                    {config.label}
-                  </button>
-                );
-              })}
+              {(() => {
+                let colorOptions = availableColors || (Object.keys(PROPERTY_SETS) as PropertyColor[]);
+                // For Rent/Wild Rent: only show colors where player has properties
+                if ((actionType === 'Rent' || actionType === 'Wild Rent') && currentPlayerBoard) {
+                  colorOptions = colorOptions.filter(c => (currentPlayerBoard.properties[c]?.length || 0) > 0);
+                }
+                // For House: only show complete sets without a house
+                if (actionType === 'House' && currentPlayerBoard) {
+                  colorOptions = (Object.keys(PROPERTY_SETS) as PropertyColor[]).filter(c =>
+                    isSetComplete(currentPlayerBoard, c) && !currentPlayerBoard.hasHouse[c]
+                  );
+                }
+                // For Hotel: only show complete sets with house but no hotel
+                if (actionType === 'Hotel' && currentPlayerBoard) {
+                  colorOptions = (Object.keys(PROPERTY_SETS) as PropertyColor[]).filter(c =>
+                    isSetComplete(currentPlayerBoard, c) && currentPlayerBoard.hasHouse[c] && !currentPlayerBoard.hasHotel[c]
+                  );
+                }
+                return colorOptions.map(color => {
+                  const config = COLOR_CONFIG[color];
+                  return (
+                    <button
+                      key={color}
+                      onClick={() => onSelectColor(color)}
+                      className={`px-3 py-2 rounded-lg border-2 text-xs font-bold transition-all ${
+                        selectedColor === color
+                          ? 'border-primary ring-2 ring-primary scale-105'
+                          : 'border-border hover:scale-105'
+                      } ${config.bg} ${config.text}`}
+                    >
+                      {config.label}
+                    </button>
+                  );
+                });
+              })()}
             </div>
           </div>
         )}

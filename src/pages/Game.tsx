@@ -38,12 +38,14 @@ import {
   anyOpponentHasStealable,
   getStealableProperties,
   getCompleteSetColors,
+  isSetComplete,
+  calculateRent,
 } from '@/lib/gameEngine';
 import { GameCardComponent } from '@/components/game/cards/GameCardComponent';
 import { CardBack } from '@/components/game/cards/CardBack';
 import { ActionResponsePanel } from '@/components/game/ActionResponsePanel';
 import { TargetSelector } from '@/components/game/TargetSelector';
-import { DollarSign, Trophy, ChevronRight, Layers, Hand, Sparkles, RefreshCw } from 'lucide-react';
+import { DollarSign, Trophy, ChevronRight, ChevronDown, Layers, Hand, Sparkles, RefreshCw } from 'lucide-react';
 
 interface Player {
   user_id: string;
@@ -79,6 +81,8 @@ export default function Game() {
   const [rearrangeCard, setRearrangeCard] = useState<GameCard | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const forceEndRef = useRef(false);
+  const [expandedOpponent, setExpandedOpponent] = useState<string | null>(null);
+  const [celebration, setCelebration] = useState<{ type: string; message: string; emoji: string } | null>(null);
 
   // Initialize
   useEffect(() => {
@@ -210,6 +214,7 @@ export default function Game() {
     const result = drawCards(gameState, myHand);
     await persistState(result.state, result.hand);
     toast.success(`Drew ${result.drawnCards.length} cards`);
+    triggerCelebration('pass_go', `Drew ${result.drawnCards.length} Cards!`, '🎉');
   }, [gameState, isMyTurn, myHand, persistState]);
 
   // Check if turn should auto-end or discard after a play
@@ -253,6 +258,11 @@ export default function Game() {
     toast.success('Added to bank!');
     await checkAutoEndTurn(result.state, result.hand);
   }, [gameState, selectedCard, myHand, persistState, checkAutoEndTurn]);
+
+  const triggerCelebration = useCallback((type: string, message: string, emoji: string) => {
+    setCelebration({ type, message, emoji });
+    setTimeout(() => setCelebration(null), 2500);
+  }, []);
 
   // Action card play - opens target selector if needed
   const handlePlayAction = useCallback(async () => {
@@ -307,6 +317,43 @@ export default function Game() {
       });
       if (!hasCompleteSets) {
         toast.error('No opponents have complete sets to steal!');
+        return;
+      }
+    }
+
+    // Rent gate: check player has properties in at least one matching color
+    if (card.name === 'Rent' || card.name === 'Wild Rent') {
+      const myBoard = gameState.boards[userId];
+      const rentColors = card.colors as PropertyColor[] | undefined;
+      const hasMatchingProps = rentColors
+        ? rentColors.some(c => (myBoard?.properties[c]?.length || 0) > 0)
+        : Object.values(myBoard?.properties || {}).some((p: GameCard[]) => p.length > 0);
+      if (!hasMatchingProps) {
+        toast.error('You need properties in a matching color to charge rent!');
+        return;
+      }
+    }
+
+    // House gate: need a complete set
+    if (card.name === 'House') {
+      const myBoard = gameState.boards[userId];
+      const hasComplete = myBoard && (Object.keys(myBoard.properties) as PropertyColor[]).some(
+        c => isSetComplete(myBoard, c) && !myBoard.hasHouse[c]
+      );
+      if (!hasComplete) {
+        toast.error('You need a complete set without a house to play House!');
+        return;
+      }
+    }
+
+    // Hotel gate: need a complete set with house
+    if (card.name === 'Hotel') {
+      const myBoard = gameState.boards[userId];
+      const hasHousedSet = myBoard && (Object.keys(myBoard.properties) as PropertyColor[]).some(
+        c => isSetComplete(myBoard, c) && myBoard.hasHouse[c] && !myBoard.hasHotel[c]
+      );
+      if (!hasHousedSet) {
+        toast.error('You need a complete set with a house to play Hotel!');
         return;
       }
     }
@@ -406,6 +453,20 @@ export default function Game() {
     setDoubleRentCardUid(null);
     await persistState(result.state, result.hand);
     toast.success(`${card.name} played!${doubleRentPending ? ' (DOUBLED!)' : ''}`);
+    // Trigger celebrations
+    const celebrationMap: Record<string, { msg: string; emoji: string }> = {
+      'Rent': { msg: `Collecting Rent!`, emoji: '💰' },
+      'Wild Rent': { msg: `Collecting Rent!`, emoji: '💰' },
+      'Sly Deal': { msg: 'Property Stolen!', emoji: '🕵️' },
+      'Deal Breaker': { msg: 'Complete Set Stolen!', emoji: '💥' },
+      'Forced Deal': { msg: 'Properties Swapped!', emoji: '🔄' },
+      "It's Your Birthday": { msg: 'Happy Birthday! Collecting M2!', emoji: '🎂' },
+      'Debt Collector': { msg: 'Collecting M5 Debt!', emoji: '🏦' },
+      'House': { msg: 'House Added! +M3 Rent', emoji: '🏠' },
+      'Hotel': { msg: 'Hotel Added! +M4 Rent', emoji: '🏨' },
+    };
+    const cele = celebrationMap[card.name];
+    if (cele) triggerCelebration(card.name, cele.msg, cele.emoji);
   }, [gameState, selectedCard, myHand, selectedTarget, selectedColor, selectedTargetCard, selectedSourceCard, doubleRentPending, persistState]);
 
   // Handle paying for an action (as a target)
@@ -588,6 +649,18 @@ export default function Game() {
 
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden">
+      {/* Celebration Overlay */}
+      {celebration && (
+        <div className="fixed inset-0 z-[60] pointer-events-none flex items-center justify-center">
+          <div className="animate-scale-in bg-card/95 backdrop-blur-md border-2 border-primary rounded-2xl shadow-2xl px-8 py-6 text-center max-w-sm">
+            <div className="text-5xl mb-2 animate-bounce">{celebration.emoji}</div>
+            <h2 className="text-xl font-black text-foreground mb-1">{celebration.message}</h2>
+            <div className="h-1 bg-primary/30 rounded-full overflow-hidden mt-3">
+              <div className="h-full bg-primary rounded-full animate-[shrink_2.5s_linear_forwards]" />
+            </div>
+          </div>
+        </div>
+      )}
       {/* Action Response Panel */}
       {gameState.phase === 'responding' && gameState.pendingAction && (
         <ActionResponsePanel
@@ -625,6 +698,7 @@ export default function Game() {
             setDoubleRentCardUid(null);
           }}
           availableColors={selectedCardData?.colors as PropertyColor[] | undefined}
+          currentPlayerBoard={myBoard}
         />
       )}
 
@@ -658,17 +732,23 @@ export default function Game() {
         </div>
       </div>
 
-      {/* Opponents area - compact */}
+      {/* Opponents area - clickable to expand */}
       <div className="flex-none flex gap-2 px-3 py-2 overflow-x-auto border-b bg-muted/30">
         {players.filter(p => p.user_id !== userId).map(player => {
           const board: PlayerBoard = gameState.boards[player.user_id] || createEmptyBoard();
           const handCount = gameState.handCounts[player.user_id] || 0;
           const isCurrentTurn = getCurrentPlayerId(gameState) === player.user_id;
+          const isExpanded = expandedOpponent === player.user_id;
+          const completeColors = getCompleteSetColors(board);
+          const inProgressColors = (Object.keys(board.properties) as PropertyColor[]).filter(
+            c => board.properties[c].length > 0 && !completeColors.includes(c)
+          );
 
           return (
             <div
               key={player.user_id}
-              className={`flex-none rounded-lg border p-2 min-w-[200px] max-w-[260px] ${isCurrentTurn ? 'border-primary bg-primary/5' : 'border-border bg-card'}`}
+              className={`flex-none rounded-lg border p-2 cursor-pointer transition-all ${isExpanded ? 'min-w-[320px] max-w-[400px]' : 'min-w-[200px] max-w-[260px]'} ${isCurrentTurn ? 'border-primary bg-primary/5' : 'border-border bg-card'}`}
+              onClick={() => setExpandedOpponent(isExpanded ? null : player.user_id)}
             >
               <div className="flex items-center justify-between mb-1">
                 <span className="font-semibold text-xs text-foreground truncate">{player.display_name}</span>
@@ -679,29 +759,93 @@ export default function Game() {
                   <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
                     <DollarSign className="w-3 h-3" /> {getBankTotal(board)}M
                   </span>
+                  {isExpanded ? <ChevronDown className="w-3 h-3 text-muted-foreground" /> : <ChevronRight className="w-3 h-3 text-muted-foreground" />}
                 </div>
               </div>
 
-              {/* Opponent's properties - compact */}
-              <div className="flex flex-wrap gap-0.5 mb-1">
-                {(Object.keys(board.properties) as PropertyColor[]).map(color => {
-                  const props = board.properties[color];
-                  if (!props || props.length === 0) return null;
-                  const setSize = PROPERTY_SETS[color].size;
-                  const isComplete = props.length >= setSize;
-                  const config = COLOR_CONFIG[color];
-                  return (
-                    <div key={color} className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${config.bg} ${config.text} ${isComplete ? 'ring-1 ring-yellow-400' : ''}`}>
-                      {config.label} ({props.length}/{setSize}) {isComplete && '✓'}
+              {/* Compact view */}
+              {!isExpanded && (
+                <>
+                  <div className="flex flex-wrap gap-0.5 mb-1">
+                    {completeColors.map(color => {
+                      const config = COLOR_CONFIG[color];
+                      return (
+                        <div key={color} className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${config.bg} ${config.text} ring-2 ring-yellow-400 shadow-sm`}>
+                          ✨ {config.label} ({board.properties[color].length}/{PROPERTY_SETS[color].size})
+                        </div>
+                      );
+                    })}
+                    {inProgressColors.map(color => {
+                      const config = COLOR_CONFIG[color];
+                      return (
+                        <div key={color} className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${config.bg} ${config.text}`}>
+                          {config.label} ({board.properties[color].length}/{PROPERTY_SETS[color].size})
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {board.bank.length > 0 && (
+                    <div className="text-[9px] text-muted-foreground font-semibold">
+                      💰 Bank: {getBankTotal(board)}M ({board.bank.length} cards)
                     </div>
-                  );
-                })}
-              </div>
+                  )}
+                </>
+              )}
 
-              {/* Opponent bank - stacked */}
-              {board.bank.length > 0 && (
-                <div className="text-[9px] text-muted-foreground font-semibold">
-                  💰 Bank: {getBankTotal(board)}M ({board.bank.length} cards)
+              {/* Expanded view - full details */}
+              {isExpanded && (
+                <div className="mt-2 space-y-2" onClick={e => e.stopPropagation()}>
+                  {/* Complete sets */}
+                  {completeColors.length > 0 && (
+                    <div>
+                      <p className="text-[9px] font-bold text-yellow-600 uppercase mb-1">✨ Complete Sets</p>
+                      <div className="flex flex-wrap gap-1">
+                        {completeColors.map(color => (
+                          <div key={color} className="rounded-lg p-1 border-2 border-yellow-400 bg-yellow-50/80 shadow-md">
+                            <div className="flex gap-0.5">
+                              {board.properties[color].map(card => (
+                                <div key={card.uid} onClick={() => setPreviewCard(card)} className="cursor-pointer">
+                                  <GameCardComponent card={card} small />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {/* In-progress sets */}
+                  {inProgressColors.length > 0 && (
+                    <div>
+                      <p className="text-[9px] font-bold text-muted-foreground uppercase mb-1">In Progress</p>
+                      <div className="flex flex-wrap gap-1">
+                        {inProgressColors.map(color => (
+                          <div key={color} className="rounded-lg p-1 border border-border">
+                            <div className="flex gap-0.5">
+                              {board.properties[color].map(card => (
+                                <div key={card.uid} onClick={() => setPreviewCard(card)} className="cursor-pointer">
+                                  <GameCardComponent card={card} small />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {/* Bank cards */}
+                  {board.bank.length > 0 && (
+                    <div>
+                      <p className="text-[9px] font-bold text-muted-foreground uppercase mb-1">💰 Bank ({getBankTotal(board)}M)</p>
+                      <div className="flex gap-0.5 flex-wrap">
+                        {board.bank.map(card => (
+                          <div key={card.uid} onClick={() => setPreviewCard(card)} className="cursor-pointer">
+                            <GameCardComponent card={card} small />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
