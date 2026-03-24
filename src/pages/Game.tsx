@@ -258,6 +258,11 @@ export default function Game() {
     await checkAutoEndTurn(result.state, result.hand);
   }, [gameState, selectedCard, myHand, persistState, checkAutoEndTurn]);
 
+  const triggerCelebration = useCallback((type: string, message: string, emoji: string) => {
+    setCelebration({ type, message, emoji });
+    setTimeout(() => setCelebration(null), 2500);
+  }, []);
+
   // Action card play - opens target selector if needed
   const handlePlayAction = useCallback(async () => {
     if (!gameState || !selectedCard) return;
