@@ -26,7 +26,7 @@ import {
 } from '@/lib/gameEngine';
 import { GameCardComponent } from '@/components/game/cards/GameCardComponent';
 import { CardBack } from '@/components/game/cards/CardBack';
-import { HandFan, DollarSign, Trophy, ChevronRight, Layers } from 'lucide-react';
+import { DollarSign, Trophy, ChevronRight, Layers, Hand } from 'lucide-react';
 
 interface Player {
   user_id: string;
