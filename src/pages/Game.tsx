@@ -686,6 +686,7 @@ export default function Game() {
             setDoubleRentCardUid(null);
           }}
           availableColors={selectedCardData?.colors as PropertyColor[] | undefined}
+          currentPlayerBoard={myBoard}
         />
       )}
 
