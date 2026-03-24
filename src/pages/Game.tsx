@@ -298,7 +298,7 @@ export default function Game() {
     if (result.state.phase === 'playing') {
       await checkAutoEndTurn(result.state, result.hand);
     }
-  }, [gameState, selectedCard, myHand, persistState]);
+  }, [gameState, selectedCard, myHand, persistState, checkAutoEndTurn]);
 
   // When Double Rent is pending and user selects a rent card
   const handlePlayRentWithDouble = useCallback(async () => {
