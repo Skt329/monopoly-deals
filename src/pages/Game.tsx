@@ -1320,13 +1320,29 @@ export default function Game() {
         </div>
       )}
 
-      {/* Game Chat */}
+      {/* Mobile floating chat */}
       <GameChat
         roomId={roomId}
         userId={userId}
         playerName={getPlayerName(userId)}
         players={players}
+        variant="floating"
+        isOpen={chatOpen}
+        onToggle={() => setChatOpen(prev => !prev)}
       />
+    </div>
+    {/* Desktop chat sidebar */}
+    {chatOpen && (
+      <GameChat
+        roomId={roomId}
+        userId={userId}
+        playerName={getPlayerName(userId)}
+        players={players}
+        variant="topbar"
+        isOpen={chatOpen}
+        onToggle={() => setChatOpen(prev => !prev)}
+      />
+    )}
     </div>
   );
 }
