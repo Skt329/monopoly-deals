@@ -57,7 +57,7 @@ import { GameCardComponent } from '@/components/game/cards/GameCardComponent';
 import { CardBack } from '@/components/game/cards/CardBack';
 import { ActionResponsePanel } from '@/components/game/ActionResponsePanel';
 import { TargetSelector } from '@/components/game/TargetSelector';
-import { DollarSign, Trophy, ChevronRight, ChevronDown, Layers, Hand, Sparkles, RefreshCw, LogOut } from 'lucide-react';
+import { DollarSign, Trophy, ChevronRight, ChevronDown, Layers, Hand, Sparkles, RefreshCw, LogOut, MessageCircle } from 'lucide-react';
 import { GameChat } from '@/components/game/GameChat';
 
 interface FlyingCard {
@@ -883,15 +883,13 @@ export default function Game() {
           </AlertDialog>
         </div>
         <div className="flex items-center gap-1 md:gap-2 text-sm flex-shrink-0">
-          <GameChat
-            roomId={roomId}
-            userId={userId}
-            playerName={getPlayerName(userId)}
-            players={players}
-            variant="topbar"
-            isOpen={chatOpen}
-            onToggle={() => setChatOpen(prev => !prev)}
-          />
+          <button
+            onClick={() => setChatOpen(prev => !prev)}
+            className="relative flex items-center justify-center w-7 h-7 md:w-8 md:h-8 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors"
+            aria-label="Toggle chat"
+          >
+            <MessageCircle className="w-4 h-4 text-primary" />
+          </button>
           <Badge variant={isMyTurn ? 'default' : 'secondary'} className={`text-[9px] md:text-xs ${isMyTurn ? 'animate-pulse' : ''}`}>
             {isMyTurn ? "⭐ Your Turn" : `${currentPlayerName}'s Turn`}
           </Badge>
