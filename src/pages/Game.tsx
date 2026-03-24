@@ -283,16 +283,21 @@ export default function Game() {
       const result = playActionCard(gameState, myHand, selectedCard);
       if (!result) { toast.error('Cannot play this action'); return; }
       setSelectedCard(null);
-      persistState(result.state, result.hand);
+      await persistState(result.state, result.hand);
       toast.success(`${card.name} played!`);
+      // Birthday triggers responding phase, no auto-end needed
       return;
     }
 
     const result = playActionCard(gameState, myHand, selectedCard);
     if (!result) { toast.error('Cannot play this action'); return; }
     setSelectedCard(null);
-    persistState(result.state, result.hand);
+    await persistState(result.state, result.hand);
     toast.success(`${card.name} played!`);
+    // For non-targeting actions like Pass Go, check auto-end
+    if (result.state.phase === 'playing') {
+      await checkAutoEndTurn(result.state, result.hand);
+    }
   }, [gameState, selectedCard, myHand, persistState]);
 
   // When Double Rent is pending and user selects a rent card
