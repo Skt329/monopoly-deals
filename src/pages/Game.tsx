@@ -33,12 +33,17 @@ import {
   createEmptyBoard,
   payWithCards,
   resolveStealAction,
+  rearrangeWildProperty,
+  hasAnyProperties,
+  anyOpponentHasStealable,
+  getStealableProperties,
+  getCompleteSetColors,
 } from '@/lib/gameEngine';
 import { GameCardComponent } from '@/components/game/cards/GameCardComponent';
 import { CardBack } from '@/components/game/cards/CardBack';
 import { ActionResponsePanel } from '@/components/game/ActionResponsePanel';
 import { TargetSelector } from '@/components/game/TargetSelector';
-import { DollarSign, Trophy, ChevronRight, Layers, Hand, Sparkles } from 'lucide-react';
+import { DollarSign, Trophy, ChevronRight, Layers, Hand, Sparkles, RefreshCw } from 'lucide-react';
 
 interface Player {
   user_id: string;
@@ -67,9 +72,11 @@ export default function Game() {
   const [selectedSourceCard, setSelectedSourceCard] = useState<string | null>(null);
   const [discardMode, setDiscardMode] = useState(false);
   const [discardSelected, setDiscardSelected] = useState<string[]>([]);
-  // Double The Rent combo state
   const [doubleRentPending, setDoubleRentPending] = useState(false);
   const [doubleRentCardUid, setDoubleRentCardUid] = useState<string | null>(null);
+  // Rearrange wild property state
+  const [rearrangeCardUid, setRearrangeCardUid] = useState<string | null>(null);
+  const [rearrangeCard, setRearrangeCard] = useState<GameCard | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const forceEndRef = useRef(false);
 
@@ -260,17 +267,48 @@ export default function Game() {
         toast.error('You need a rent card to pair with Double The Rent!');
         return;
       }
-      // Check if we have enough plays left (need 2: one for DTR, one for rent)
       if (gameState.cardsPlayedThisTurn >= 2) {
         toast.error('Not enough plays left for Double The Rent combo (needs 2 plays)');
         return;
       }
-      // First, discard the DTR card and increment plays
       setDoubleRentPending(true);
       setDoubleRentCardUid(selectedCard);
       setSelectedCard(null);
       toast.info('Double The Rent activated! Now select a rent card to play.');
       return;
+    }
+
+    // Forced Deal gate: check player has properties
+    if (card.name === 'Forced Deal') {
+      const myBoard = gameState.boards[userId];
+      if (!myBoard || !hasAnyProperties(myBoard)) {
+        toast.error('You need at least one property to use Forced Deal!');
+        return;
+      }
+      if (!anyOpponentHasStealable(gameState.boards, userId)) {
+        toast.error('No opponents have stealable properties!');
+        return;
+      }
+    }
+
+    // Sly Deal gate: check opponents have stealable properties
+    if (card.name === 'Sly Deal') {
+      if (!anyOpponentHasStealable(gameState.boards, userId)) {
+        toast.error('No opponents have stealable properties!');
+        return;
+      }
+    }
+
+    // Deal Breaker gate: check opponents have complete sets
+    if (card.name === 'Deal Breaker') {
+      const hasCompleteSets = Object.keys(gameState.boards).some(pid => {
+        if (pid === userId) return false;
+        return getCompleteSetColors(gameState.boards[pid]).length > 0;
+      });
+      if (!hasCompleteSets) {
+        toast.error('No opponents have complete sets to steal!');
+        return;
+      }
     }
 
     const needsTarget = ['Debt Collector', 'Sly Deal', 'Forced Deal', 'Deal Breaker', 'Wild Rent'].includes(card.name);
@@ -293,7 +331,6 @@ export default function Game() {
       setSelectedCard(null);
       await persistState(result.state, result.hand);
       toast.success(`${card.name} played!`);
-      // Birthday triggers responding phase, no auto-end needed
       return;
     }
 
@@ -302,11 +339,10 @@ export default function Game() {
     setSelectedCard(null);
     await persistState(result.state, result.hand);
     toast.success(`${card.name} played!`);
-    // For non-targeting actions like Pass Go, check auto-end
     if (result.state.phase === 'playing') {
       await checkAutoEndTurn(result.state, result.hand);
     }
-  }, [gameState, selectedCard, myHand, persistState, checkAutoEndTurn]);
+  }, [gameState, selectedCard, myHand, persistState, checkAutoEndTurn, userId]);
 
   // When Double Rent is pending and user selects a rent card
   const handlePlayRentWithDouble = useCallback(async () => {
@@ -317,13 +353,11 @@ export default function Game() {
       return;
     }
 
-    // First, consume the DTR card
     const dtrIndex = myHand.findIndex(c => c.uid === doubleRentCardUid);
     if (dtrIndex === -1) return;
     const dtrCard = myHand[dtrIndex];
     const handAfterDTR = myHand.filter((_, i) => i !== dtrIndex);
 
-    // Increment plays for DTR
     const stateAfterDTR: PublicGameState = {
       ...gameState,
       discardPile: [...gameState.discardPile, dtrCard],
@@ -331,7 +365,6 @@ export default function Game() {
       handCounts: { ...gameState.handCounts, [userId]: handAfterDTR.length },
     };
 
-    // Now open target selector for the rent card with doubleRent flag
     setTargetAction(rentCard.name);
     setSelectedTarget(null);
     setSelectedColor(null);
@@ -339,10 +372,8 @@ export default function Game() {
     setSelectedSourceCard(null);
     setShowTargetSelector(true);
 
-    // Store intermediate state
     setGameState(stateAfterDTR);
     setMyHand(handAfterDTR);
-    // Update DB with DTR consumed
     await Promise.all([
       supabase.from('game_states').update({ current_state: stateAfterDTR as unknown as import('@/integrations/supabase/types').Json }).eq('room_id', roomId),
       supabase.from('player_hands').update({ hand: handAfterDTR as unknown as import('@/integrations/supabase/types').Json }).eq('room_id', roomId).eq('user_id', userId),
@@ -423,14 +454,13 @@ export default function Game() {
     toast.success('Just Say No! Action blocked! 🛡️');
   }, [gameState, userId, myHand, persistState]);
 
-  // Handle accepting steal actions — now actually transfers properties
+  // Handle accepting steal actions
   const handleAccept = useCallback(async () => {
     if (!gameState || !gameState.pendingAction) return;
     const pending = gameState.pendingAction;
 
     let stateAfterResolve = gameState;
 
-    // Execute the steal/transfer
     if (['deal_breaker', 'sly_deal', 'forced_deal'].includes(pending.type)) {
       stateAfterResolve = resolveStealAction(gameState, pending, userId);
     }
@@ -457,10 +487,8 @@ export default function Game() {
 
   const handleEndTurn = useCallback(async () => {
     if (!gameState || !isMyTurn) return;
-    // If hand > 7 but player still has plays left, warn them
     if (needsDiscard(myHand) && gameState.cardsPlayedThisTurn < 3) {
       toast.warning(`You still have ${3 - gameState.cardsPlayedThisTurn} play(s) left! Use them to reduce your hand, or click End Turn again to discard.`, { id: 'end-turn-warn' });
-      // Set a flag so second click forces discard
       if (!forceEndRef.current) {
         forceEndRef.current = true;
         return;
@@ -493,14 +521,25 @@ export default function Game() {
   }, [gameState, myHand, discardSelected, persistState]);
 
   const handleCardClick = (uid: string) => {
-    if (discardMode) return; // handled by discard toggle
+    if (discardMode) return;
     const card = myHand.find(c => c.uid === uid);
     if (!card) return;
-    // Open preview dialog with card details + action buttons
     setPreviewCard(card);
     setSelectedCard(uid);
     setShowColorPicker(false);
   };
+
+  // Rearrange wild property
+  const handleRearrange = useCallback(async (cardUid: string, newColor: PropertyColor) => {
+    if (!gameState) return;
+    const result = rearrangeWildProperty(gameState, userId, cardUid, newColor);
+    if (!result) { toast.error('Cannot rearrange this card'); return; }
+    setRearrangeCardUid(null);
+    setRearrangeCard(null);
+    setGameState(result);
+    await supabase.from('game_states').update({ current_state: result as unknown as import('@/integrations/supabase/types').Json }).eq('room_id', roomId);
+    toast.success('Property rearranged!');
+  }, [gameState, userId, roomId]);
 
   const selectedCardData = selectedCard ? myHand.find(c => c.uid === selectedCard) : null;
   const myBoard = gameState?.boards[userId] || createEmptyBoard();
@@ -549,7 +588,7 @@ export default function Game() {
 
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden">
-      {/* Action Response Panel - shown when an action is pending against us */}
+      {/* Action Response Panel */}
       {gameState.phase === 'responding' && gameState.pendingAction && (
         <ActionResponsePanel
           gameState={gameState}
@@ -563,7 +602,7 @@ export default function Game() {
         />
       )}
 
-      {/* Target Selector - shown when playing action that needs target/color */}
+      {/* Target Selector */}
       {showTargetSelector && (
         <TargetSelector
           players={players}
@@ -590,41 +629,37 @@ export default function Game() {
       )}
 
       {/* Top bar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b bg-card shadow-sm">
-        <div className="flex items-center gap-3">
-          <h2 className="font-bold text-foreground tracking-tight">MONOPOLY DEAL</h2>
-          <Badge variant="secondary" className="font-mono text-xs">{roomCode}</Badge>
+      <div className="flex items-center justify-between px-3 py-1.5 border-b bg-card shadow-sm">
+        <div className="flex items-center gap-2">
+          <h2 className="font-bold text-sm text-foreground tracking-tight">MONOPOLY DEAL</h2>
+          <Badge variant="secondary" className="font-mono text-[10px]">{roomCode}</Badge>
         </div>
-        <div className="flex items-center gap-3 text-sm">
-          <Badge variant={isMyTurn ? 'default' : 'secondary'} className={isMyTurn ? 'animate-pulse' : ''}>
+        <div className="flex items-center gap-2 text-sm">
+          <Badge variant={isMyTurn ? 'default' : 'secondary'} className={`text-xs ${isMyTurn ? 'animate-pulse' : ''}`}>
             {isMyTurn ? "⭐ Your Turn" : `${currentPlayerName}'s Turn`}
           </Badge>
           {isMyTurn && gameState.phase === 'playing' && (
-            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full font-bold text-sm border-2 ${
+            <div className={`flex items-center gap-1 px-2 py-1 rounded-full font-bold text-xs border ${
               gameState.cardsPlayedThisTurn >= 3
                 ? 'bg-destructive/10 border-destructive text-destructive'
                 : gameState.cardsPlayedThisTurn >= 2
                   ? 'bg-amber-100 border-amber-400 text-amber-700'
                   : 'bg-primary/10 border-primary text-primary'
             }`}>
-              🎴 {gameState.cardsPlayedThisTurn} / 3
+              🎴 {gameState.cardsPlayedThisTurn}/3
             </div>
           )}
           {doubleRentPending && (
-            <Badge variant="destructive" className="animate-pulse">
-              ⚡ Double Rent Active — Pick a Rent Card!
-            </Badge>
+            <Badge variant="destructive" className="text-[10px] animate-pulse">⚡ Double Rent — Pick Rent!</Badge>
           )}
           {gameState.phase === 'responding' && (
-            <Badge variant="destructive" className="animate-pulse">
-              ⚡ Waiting for response...
-            </Badge>
+            <Badge variant="destructive" className="text-[10px] animate-pulse">⚡ Waiting...</Badge>
           )}
         </div>
       </div>
 
-      {/* Opponents area */}
-      <div className="flex-none flex gap-3 px-4 py-3 overflow-x-auto border-b bg-muted/30">
+      {/* Opponents area - compact */}
+      <div className="flex-none flex gap-2 px-3 py-2 overflow-x-auto border-b bg-muted/30">
         {players.filter(p => p.user_id !== userId).map(player => {
           const board: PlayerBoard = gameState.boards[player.user_id] || createEmptyBoard();
           const handCount = gameState.handCounts[player.user_id] || 0;
@@ -633,139 +668,150 @@ export default function Game() {
           return (
             <div
               key={player.user_id}
-              className={`flex-none rounded-xl border-2 p-3 min-w-[240px] ${isCurrentTurn ? 'border-primary bg-primary/5' : 'border-border bg-card'}`}
+              className={`flex-none rounded-lg border p-2 min-w-[200px] max-w-[260px] ${isCurrentTurn ? 'border-primary bg-primary/5' : 'border-border bg-card'}`}
             >
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-semibold text-sm text-foreground">{player.display_name}</span>
-                <div className="flex items-center gap-2">
-                  <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-semibold text-xs text-foreground truncate">{player.display_name}</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
                     <Hand className="w-3 h-3" /> {handCount}
                   </span>
-                  <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
                     <DollarSign className="w-3 h-3" /> {getBankTotal(board)}M
                   </span>
                 </div>
               </div>
 
-              {/* Opponent's played properties */}
-              <div className="flex flex-wrap gap-1 mb-2">
+              {/* Opponent's properties - compact */}
+              <div className="flex flex-wrap gap-0.5 mb-1">
                 {(Object.keys(board.properties) as PropertyColor[]).map(color => {
                   const props = board.properties[color];
                   if (!props || props.length === 0) return null;
                   const setSize = PROPERTY_SETS[color].size;
                   const isComplete = props.length >= setSize;
+                  const config = COLOR_CONFIG[color];
                   return (
-                    <div key={color} className={`rounded-lg border p-1 ${isComplete ? 'border-yellow-400 shadow-md bg-yellow-50' : 'border-border'}`}>
-                      <div className="flex gap-0.5">
-                        {props.map(card => (
-                          <GameCardComponent key={card.uid} card={card} small />
-                        ))}
-                      </div>
-                      {isComplete && <span className="text-[7px] font-bold text-yellow-600 block text-center">✓ SET</span>}
+                    <div key={color} className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${config.bg} ${config.text} ${isComplete ? 'ring-1 ring-yellow-400' : ''}`}>
+                      {config.label} ({props.length}/{setSize}) {isComplete && '✓'}
                     </div>
                   );
                 })}
               </div>
 
-              {/* Opponent's bank */}
+              {/* Opponent bank - stacked */}
               {board.bank.length > 0 && (
-                <div className="flex gap-0.5 flex-wrap">
-                  <span className="text-[8px] text-muted-foreground font-bold mr-1">Bank:</span>
-                  {board.bank.map(card => (
-                    <GameCardComponent key={card.uid} card={card} small />
-                  ))}
+                <div className="text-[9px] text-muted-foreground font-semibold">
+                  💰 Bank: {getBankTotal(board)}M ({board.bank.length} cards)
                 </div>
               )}
-
-              {/* Hidden hand */}
-              <div className="flex gap-0.5 mt-2">
-                {Array.from({ length: Math.min(handCount, 7) }).map((_, i) => (
-                  <CardBack key={i} small className="scale-[0.5] -mx-1.5" />
-                ))}
-              </div>
             </div>
           );
         })}
       </div>
 
-      {/* Center area */}
-      <div className="flex-1 flex items-center justify-center gap-8 px-4 overflow-auto">
+      {/* Center area - more space */}
+      <div className="flex-1 flex gap-4 px-3 py-2 overflow-auto min-h-0">
         {/* My properties */}
-        <div className="flex flex-col gap-2 max-w-[450px]">
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Your Properties</h3>
-          <div className="flex flex-wrap gap-2">
+        <div className="flex-1 flex flex-col gap-1.5 overflow-y-auto min-w-0">
+          <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Your Properties</h3>
+          <div className="flex flex-wrap gap-1.5">
             {(Object.keys(myBoard.properties) as PropertyColor[]).map(color => {
               const props = myBoard.properties[color] || [];
               if (props.length === 0) return null;
               const setSize = PROPERTY_SETS[color].size;
               const isComplete = props.length >= setSize;
               return (
-                <div key={color} className={`rounded-lg p-2 border ${isComplete ? 'border-yellow-400 shadow-lg bg-yellow-50' : 'border-border'}`}>
-                  <div className="flex gap-1 mb-1">
+                <div key={color} className={`rounded-lg p-1.5 border ${isComplete ? 'border-yellow-400 shadow-md bg-yellow-50' : 'border-border'}`}>
+                  <div className="flex gap-0.5 mb-0.5">
                     {props.map(card => (
-                      <GameCardComponent key={card.uid} card={card} small />
+                      <div key={card.uid} className="relative group">
+                        <GameCardComponent card={card} small />
+                        {/* Rearrange button for wild properties */}
+                        {card.type === 'wild_property' && isMyTurn && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRearrangeCardUid(card.uid);
+                              setRearrangeCard(card);
+                            }}
+                            className="absolute -top-1 -right-1 w-4 h-4 bg-primary text-primary-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="Rearrange"
+                          >
+                            <RefreshCw className="w-2.5 h-2.5" />
+                          </button>
+                        )}
+                      </div>
                     ))}
                   </div>
-                  {isComplete && <Badge className="text-[8px] bg-yellow-400 text-yellow-900">COMPLETE</Badge>}
+                  {isComplete && <Badge className="text-[7px] bg-yellow-400 text-yellow-900 px-1 py-0">SET ✓</Badge>}
                 </div>
               );
             })}
           </div>
-          {/* Bank */}
-          <div className="mt-2">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-              Bank: {getBankTotal(myBoard)}M
+
+          {/* Bank - stacked */}
+          <div className="mt-1">
+            <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">
+              💰 Bank: {getBankTotal(myBoard)}M ({myBoard.bank.length} cards)
             </h3>
-            <div className="flex gap-1 flex-wrap">
-              {myBoard.bank.map(card => (
-                <GameCardComponent key={card.uid} card={card} small />
-              ))}
-            </div>
+            {myBoard.bank.length > 0 && (
+              <div className="relative h-16 w-12">
+                {myBoard.bank.slice(0, 5).map((card, i) => (
+                  <div key={card.uid} className="absolute" style={{ top: i * 2, left: i * 2 }}>
+                    <GameCardComponent card={card} small />
+                  </div>
+                ))}
+                {myBoard.bank.length > 5 && (
+                  <div className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground text-[8px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                    +{myBoard.bank.length - 5}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Deck & Discard */}
-        <div className="flex flex-col items-center gap-3">
+        {/* Deck & Discard - center */}
+        <div className="flex flex-col items-center gap-2 flex-none">
           <div className="text-center">
             <CardBack count={gameState.deck.length} />
-            <p className="text-[10px] text-muted-foreground mt-1">Draw Pile</p>
+            <p className="text-[9px] text-muted-foreground mt-0.5">Draw ({gameState.deck.length})</p>
           </div>
           {isMyTurn && gameState.phase === 'drawing' && (
-            <Button onClick={handleDraw} className="gap-1 text-sm animate-pulse">
+            <Button onClick={handleDraw} size="sm" className="gap-1 text-xs animate-pulse">
               Draw Cards
             </Button>
           )}
           <div className="text-center">
-            <div className="w-20 h-28 rounded-xl border-2 border-dashed border-border flex items-center justify-center bg-muted/20">
+            <div className="w-16 h-24 rounded-lg border-2 border-dashed border-border flex items-center justify-center bg-muted/20">
               {gameState.discardPile.length > 0 ? (
                 <GameCardComponent card={gameState.discardPile[gameState.discardPile.length - 1]} small />
               ) : (
-                <Layers className="w-6 h-6 text-muted-foreground/30" />
+                <Layers className="w-5 h-5 text-muted-foreground/30" />
               )}
             </div>
-            <p className="text-[10px] text-muted-foreground mt-1">Discard</p>
+            <p className="text-[9px] text-muted-foreground mt-0.5">Discard</p>
           </div>
         </div>
 
-        {/* Sets counter */}
-        <div className="flex flex-col items-center gap-2">
+        {/* Sets counter + End Turn */}
+        <div className="flex flex-col items-center gap-2 flex-none">
           <div className="text-center">
-            <p className="text-4xl font-bold text-foreground">
-              {countCompleteSets(myBoard)}
-            </p>
-            <p className="text-xs text-muted-foreground">/ 3 Sets</p>
+            <p className="text-3xl font-bold text-foreground">{countCompleteSets(myBoard)}</p>
+            <p className="text-[10px] text-muted-foreground">/ 3 Sets</p>
           </div>
           {isMyTurn && gameState.phase === 'playing' && (
             <div className="flex flex-col items-center gap-1">
               <Button
                 onClick={handleEndTurn}
+                size="sm"
                 variant={gameState.cardsPlayedThisTurn >= 3 ? 'default' : 'secondary'}
-                className={`gap-1 text-sm ${gameState.cardsPlayedThisTurn >= 3 ? 'animate-pulse' : ''}`}
+                className={`gap-1 text-xs ${gameState.cardsPlayedThisTurn >= 3 ? 'animate-pulse' : ''}`}
               >
                 End Turn <ChevronRight className="w-3 h-3" />
               </Button>
               {gameState.cardsPlayedThisTurn >= 3 && (
-                <span className="text-[10px] text-destructive font-semibold">No more plays!</span>
+                <span className="text-[9px] text-destructive font-semibold">No more plays!</span>
               )}
             </div>
           )}
@@ -780,33 +826,29 @@ export default function Game() {
           </DialogHeader>
           {previewCard && (
             <div className="flex flex-col items-center gap-4">
-              {/* Enlarged card */}
               <div className="transform scale-150 origin-center my-4">
                 <GameCardComponent card={previewCard} />
               </div>
               <p className="text-xs text-muted-foreground text-center">
                 Type: {previewCard.type} · Value: M{previewCard.value}
                 {previewCard.type === 'property' && previewCard.color && ` · ${COLOR_CONFIG[previewCard.color].label}`}
+                {previewCard.description && ` · ${previewCard.description}`}
               </p>
 
-              {/* Action buttons inside dialog — only show on your turn during playing phase */}
               {isMyTurn && gameState.phase === 'playing' && (
                 <div className="flex flex-col gap-2 w-full">
-                  {/* Money cards: only Play to Bank */}
                   {previewCard.type === 'money' && (
                     <Button size="sm" className="w-full" onClick={() => { setPreviewCard(null); handlePlayAsMoney(); }}>
                       Play to Bank (M{previewCard.value})
                     </Button>
                   )}
 
-                  {/* Property cards: only Play as Property */}
                   {previewCard.type === 'property' && (
                     <Button size="sm" className="w-full" onClick={() => { setPreviewCard(null); handlePlayAsProperty(previewCard.color!); }}>
                       Play as Property
                     </Button>
                   )}
 
-                  {/* Wild Property */}
                   {previewCard.type === 'wild_property' && (
                     <>
                       <div className="flex flex-col gap-1">
@@ -814,14 +856,16 @@ export default function Game() {
                           Play as Property
                         </Button>
                         {showColorPicker && (
-                          <div className="flex gap-1 justify-center">
+                          <div className="flex gap-1 justify-center flex-wrap">
                             {previewCard.colors?.map(color => (
                               <button
                                 key={color}
                                 onClick={() => { setPreviewCard(null); handlePlayAsProperty(color); }}
-                                className={`${COLOR_CONFIG[color].bg} w-8 h-8 rounded-full border-2 border-background hover:scale-110 transition-transform`}
+                                className={`${COLOR_CONFIG[color].bg} px-2 py-1 rounded text-[10px] font-bold ${COLOR_CONFIG[color].text} hover:scale-110 transition-transform`}
                                 title={COLOR_CONFIG[color].label}
-                              />
+                              >
+                                {COLOR_CONFIG[color].label}
+                              </button>
                             ))}
                           </div>
                         )}
@@ -832,7 +876,6 @@ export default function Game() {
                     </>
                   )}
 
-                  {/* Action cards: Play Action OR Play as Money — but NOT for Just Say No */}
                   {previewCard.type === 'action' && !doubleRentPending && (
                     <>
                       {previewCard.name !== 'Just Say No' && (
@@ -846,7 +889,6 @@ export default function Game() {
                     </>
                   )}
 
-                  {/* Rent cards */}
                   {previewCard.type === 'rent' && !doubleRentPending && (
                     <>
                       <Button size="sm" className="w-full" onClick={() => { setPreviewCard(null); handlePlayAction(); }}>
@@ -858,7 +900,6 @@ export default function Game() {
                     </>
                   )}
 
-                  {/* Double Rent combo */}
                   {doubleRentPending && previewCard.type === 'rent' && (
                     <Button size="sm" variant="destructive" className="w-full" onClick={() => { setPreviewCard(null); handlePlayRentWithDouble(); }}>
                       🔥 Play with Double Rent!
@@ -866,6 +907,32 @@ export default function Game() {
                   )}
                 </div>
               )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Rearrange Wild Property Dialog */}
+      <Dialog open={!!rearrangeCardUid} onOpenChange={(open) => { if (!open) { setRearrangeCardUid(null); setRearrangeCard(null); } }}>
+        <DialogContent className="max-w-xs p-4">
+          <DialogHeader>
+            <DialogTitle className="text-center">Rearrange Wild Property</DialogTitle>
+          </DialogHeader>
+          {rearrangeCard && (
+            <div className="flex flex-col items-center gap-3">
+              <GameCardComponent card={rearrangeCard} />
+              <p className="text-xs text-muted-foreground">Move to which color?</p>
+              <div className="flex gap-1 flex-wrap justify-center">
+                {rearrangeCard.colors?.map(color => (
+                  <button
+                    key={color}
+                    onClick={() => handleRearrange(rearrangeCardUid!, color)}
+                    className={`${COLOR_CONFIG[color].bg} ${COLOR_CONFIG[color].text} px-3 py-1.5 rounded text-xs font-bold hover:scale-110 transition-transform`}
+                  >
+                    {COLOR_CONFIG[color].label}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </DialogContent>
@@ -906,19 +973,17 @@ export default function Game() {
 
       {/* My hand */}
       {!discardMode && (
-        <div className="flex-none border-t bg-card/90 backdrop-blur-sm px-4 py-3 shadow-inner">
-          <div className="flex items-center gap-2 mb-2">
-            <Hand className="w-4 h-4 text-muted-foreground" />
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Your Hand ({myHand.length})
+        <div className="flex-none border-t bg-card/90 backdrop-blur-sm px-3 py-2 shadow-inner">
+          <div className="flex items-center gap-2 mb-1">
+            <Hand className="w-3 h-3 text-muted-foreground" />
+            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+              Hand ({myHand.length})
             </span>
             {doubleRentPending && (
-              <Badge variant="destructive" className="text-[10px] animate-pulse">
-                Select a Rent card!
-              </Badge>
+              <Badge variant="destructive" className="text-[9px] animate-pulse">Select a Rent card!</Badge>
             )}
           </div>
-          <div className="flex gap-2 overflow-x-auto pb-2 justify-center">
+          <div className="flex gap-1.5 overflow-x-auto pb-1 justify-center">
             {myHand.map((card, i) => (
               <div key={card.uid} className="flex-none" style={{ animationDelay: `${i * 50}ms` }}>
                 <GameCardComponent
