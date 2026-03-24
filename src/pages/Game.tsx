@@ -260,13 +260,39 @@ export default function Game() {
     ]);
   }, [roomId, userId]);
 
+  // Flying card animation helper
+  const animateCardDraw = useCallback((count: number) => {
+    const deckEl = deckRef.current;
+    const handEl = handRef.current;
+    if (!deckEl || !handEl) return;
+    const deckRect = deckEl.getBoundingClientRect();
+    const handRect = handEl.getBoundingClientRect();
+    const cards: FlyingCard[] = [];
+    for (let i = 0; i < count; i++) {
+      cards.push({
+        id: `fly-${Date.now()}-${i}`,
+        startX: deckRect.left + deckRect.width / 2,
+        startY: deckRect.top + deckRect.height / 2,
+        endX: handRect.left + handRect.width / 2 + (i - count / 2) * 40,
+        endY: handRect.top,
+        started: false,
+      });
+    }
+    setFlyingCards(cards);
+    requestAnimationFrame(() => {
+      setFlyingCards(prev => prev.map(c => ({ ...c, started: true })));
+    });
+    setTimeout(() => setFlyingCards([]), 700);
+  }, []);
+
   const handleDraw = useCallback(async () => {
     if (!gameState || !isMyTurn || gameState.phase !== 'drawing') return;
     const result = drawCards(gameState, myHand);
+    animateCardDraw(result.drawnCards.length);
     await persistState(result.state, result.hand);
+    broadcastMove(`drew ${result.drawnCards.length} cards`);
     toast.success(`Drew ${result.drawnCards.length} cards`);
-    triggerCelebration('pass_go', `Drew ${result.drawnCards.length} Cards!`, '🎉');
-  }, [gameState, isMyTurn, myHand, persistState]);
+  }, [gameState, isMyTurn, myHand, persistState, animateCardDraw, broadcastMove]);
 
   // Check if turn should auto-end or discard after a play
   const checkAutoEndTurn = useCallback(async (newState: PublicGameState, newHand: GameCard[]) => {
