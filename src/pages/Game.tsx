@@ -961,7 +961,7 @@ export default function Game() {
                 <div key={color} className={`rounded-lg p-1.5 border ${isComplete ? 'border-yellow-400 shadow-md bg-yellow-50' : 'border-border'}`}>
                   <div className="flex gap-0.5 mb-0.5">
                     {props.map(card => (
-                      <div key={card.uid} className="relative group">
+                      <div key={card.uid} className="relative group cursor-pointer" onClick={() => setPreviewCard(card)}>
                         <GameCardComponent card={card} small />
                         {/* Rearrange button for wild properties */}
                         {card.type === 'wild_property' && isMyTurn && (
