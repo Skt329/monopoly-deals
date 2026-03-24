@@ -852,14 +852,15 @@ export default function Game() {
       ))}
 
       {/* Top bar */}
-      <div className="flex items-center justify-between px-3 py-1.5 border-b bg-card shadow-sm">
-        <div className="flex items-center gap-2">
-          <h2 className="font-bold text-sm text-foreground tracking-tight">MONOPOLY DEAL</h2>
-          <Badge variant="secondary" className="font-mono text-[10px]">{roomCode}</Badge>
+      <div className="flex items-center justify-between px-2 py-1 md:px-3 md:py-1.5 border-b bg-card shadow-sm">
+        <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
+          <h2 className="font-bold text-[10px] md:text-sm text-foreground tracking-tight whitespace-nowrap">MONOPOLY DEAL</h2>
+          <Badge variant="secondary" className="font-mono text-[8px] md:text-[10px] hidden sm:inline-flex">{roomCode}</Badge>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] text-destructive hover:text-destructive">
-                <LogOut className="w-3 h-3 mr-1" /> Exit
+              <Button variant="ghost" size="sm" className="h-5 md:h-6 px-1.5 md:px-2 text-[9px] md:text-[10px] text-destructive hover:text-destructive">
+                <LogOut className="w-3 h-3" />
+                <span className="hidden sm:inline ml-1">Exit</span>
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
@@ -878,12 +879,12 @@ export default function Game() {
             </AlertDialogContent>
           </AlertDialog>
         </div>
-        <div className="flex items-center gap-2 text-sm">
-          <Badge variant={isMyTurn ? 'default' : 'secondary'} className={`text-xs ${isMyTurn ? 'animate-pulse' : ''}`}>
+        <div className="flex items-center gap-1 md:gap-2 text-sm flex-shrink-0">
+          <Badge variant={isMyTurn ? 'default' : 'secondary'} className={`text-[9px] md:text-xs ${isMyTurn ? 'animate-pulse' : ''}`}>
             {isMyTurn ? "⭐ Your Turn" : `${currentPlayerName}'s Turn`}
           </Badge>
           {isMyTurn && gameState.phase === 'playing' && (
-            <div className={`flex items-center gap-1 px-2 py-1 rounded-full font-bold text-xs border ${
+            <div className={`flex items-center gap-0.5 px-1.5 py-0.5 md:px-2 md:py-1 rounded-full font-bold text-[9px] md:text-xs border ${
               gameState.cardsPlayedThisTurn >= 3
                 ? 'bg-destructive/10 border-destructive text-destructive'
                 : gameState.cardsPlayedThisTurn >= 2
@@ -894,10 +895,10 @@ export default function Game() {
             </div>
           )}
           {doubleRentPending && (
-            <Badge variant="destructive" className="text-[10px] animate-pulse">⚡ Double Rent — Pick Rent!</Badge>
+            <Badge variant="destructive" className="text-[8px] md:text-[10px] animate-pulse">⚡ Double Rent</Badge>
           )}
           {gameState.phase === 'responding' && (
-            <Badge variant="destructive" className="text-[10px] animate-pulse">⚡ Waiting...</Badge>
+            <Badge variant="destructive" className="text-[8px] md:text-[10px] animate-pulse">⚡ Waiting...</Badge>
           )}
         </div>
       </div>
