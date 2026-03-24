@@ -235,9 +235,11 @@ export function playActionCard(
   if (card.type !== 'action' && card.type !== 'rent') return null;
 
   const newHand = hand.filter((_, i) => i !== cardIndex);
+  // Don't blanket-discard; House/Hotel stay on the board
+  const shouldDiscard = card.name !== 'House' && card.name !== 'Hotel';
   let newState: PublicGameState = {
     ...state,
-    discardPile: [...state.discardPile, card],
+    discardPile: shouldDiscard ? [...state.discardPile, card] : state.discardPile,
     cardsPlayedThisTurn: state.cardsPlayedThisTurn + 1,
     handCounts: { ...state.handCounts, [playerId]: newHand.length },
   };
