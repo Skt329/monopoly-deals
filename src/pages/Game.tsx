@@ -655,26 +655,61 @@ export default function Game() {
         </div>
       )}
 
+      {/* Discard overlay */}
+      {discardMode && (
+        <div className="flex-none px-4 py-3 border-t bg-destructive/5 border-destructive/30">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-bold text-destructive">
+              ⚠️ Discard {myHand.length - MAX_HAND_SIZE} card{myHand.length - MAX_HAND_SIZE > 1 ? 's' : ''} (you have {myHand.length}, max {MAX_HAND_SIZE})
+            </span>
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={discardSelected.length < myHand.length - MAX_HAND_SIZE}
+              onClick={handleConfirmDiscard}
+            >
+              Confirm Discard ({discardSelected.length}/{myHand.length - MAX_HAND_SIZE})
+            </Button>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-2 justify-center">
+            {myHand.map((card) => (
+              <div
+                key={card.uid}
+                className="flex-none cursor-pointer"
+                onClick={() => handleDiscardToggle(card.uid)}
+              >
+                <GameCardComponent
+                  card={card}
+                  selected={discardSelected.includes(card.uid)}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* My hand */}
-      <div className="flex-none border-t bg-card/90 backdrop-blur-sm px-4 py-3 shadow-inner">
-        <div className="flex items-center gap-2 mb-2">
-          <Hand className="w-4 h-4 text-muted-foreground" />
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Your Hand ({myHand.length})
-          </span>
+      {!discardMode && (
+        <div className="flex-none border-t bg-card/90 backdrop-blur-sm px-4 py-3 shadow-inner">
+          <div className="flex items-center gap-2 mb-2">
+            <Hand className="w-4 h-4 text-muted-foreground" />
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Your Hand ({myHand.length})
+            </span>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-2 justify-center">
+            {myHand.map((card, i) => (
+              <div key={card.uid} className="flex-none" style={{ animationDelay: `${i * 50}ms` }}>
+                <GameCardComponent
+                  card={card}
+                  onClick={() => handleCardClick(card.uid)}
+                  selected={selectedCard === card.uid}
+                />
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-2 justify-center">
-          {myHand.map((card, i) => (
-            <div key={card.uid} className="flex-none" style={{ animationDelay: `${i * 50}ms` }}>
-              <GameCardComponent
-                card={card}
-                onClick={() => handleCardClick(card.uid)}
-                selected={selectedCard === card.uid}
-              />
-            </div>
-          ))}
-        </div>
-      </div>
+      )}
     </div>
   );
 }
