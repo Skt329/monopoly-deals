@@ -442,16 +442,40 @@ export default function Game() {
     setDoubleRentPending(false);
     setDoubleRentCardUid(null);
 
-    // Build detailed log message
+    // Build detailed log message with specific card names
     let detail = `played ${card.name}`;
     const targetName = selectedTarget ? getPlayerName(selectedTarget) : '';
-    if (card.name === 'Sly Deal' && targetName) detail = `used Sly Deal to steal a property from ${targetName}`;
-    if (card.name === 'Forced Deal' && targetName) detail = `used Forced Deal to swap properties with ${targetName}`;
+    if (card.name === 'Sly Deal' && targetName && selectedTargetCard) {
+      const tBoard = gameState.boards[selectedTarget!];
+      let cardName = 'a property';
+      if (tBoard) {
+        for (const c of Object.keys(tBoard.properties) as PropertyColor[]) {
+          const found = tBoard.properties[c].find(p => p.uid === selectedTargetCard);
+          if (found) { cardName = found.name; break; }
+        }
+      }
+      detail = `used Sly Deal to steal ${cardName} from ${targetName}`;
+    }
+    if (card.name === 'Forced Deal' && targetName && selectedTargetCard && selectedSourceCard) {
+      const tBoard = gameState.boards[selectedTarget!];
+      let targetCardName = 'a property', sourceCardName = 'a property';
+      if (tBoard) {
+        for (const c of Object.keys(tBoard.properties) as PropertyColor[]) {
+          const found = tBoard.properties[c].find(p => p.uid === selectedTargetCard);
+          if (found) { targetCardName = found.name; break; }
+        }
+      }
+      for (const c of Object.keys(myBoard.properties) as PropertyColor[]) {
+        const found = myBoard.properties[c].find(p => p.uid === selectedSourceCard);
+        if (found) { sourceCardName = found.name; break; }
+      }
+      detail = `used Forced Deal: swapped ${sourceCardName} for ${targetName}'s ${targetCardName}`;
+    }
     if (card.name === 'Deal Breaker' && targetName && selectedColor) detail = `used Deal Breaker to steal ${COLOR_CONFIG[selectedColor].label} set from ${targetName}`;
     if (card.name === 'Debt Collector' && targetName) detail = `charged M5 debt from ${targetName}`;
     if ((card.name === 'Rent' || card.name === 'Wild Rent') && selectedColor) {
-      const myBoard = gameState.boards[userId];
-      const rentAmount = myBoard ? calculateRent(myBoard, selectedColor) * (doubleRentPending ? 2 : 1) : 0;
+      const rentBoard = gameState.boards[userId];
+      const rentAmount = rentBoard ? calculateRent(rentBoard, selectedColor) * (doubleRentPending ? 2 : 1) : 0;
       detail = `charged M${rentAmount} rent on ${COLOR_CONFIG[selectedColor].label}${doubleRentPending ? ' (DOUBLED!)' : ''}`;
     }
     if (card.name === 'House' && selectedColor) detail = `added House to ${COLOR_CONFIG[selectedColor].label} set`;
