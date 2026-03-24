@@ -1110,10 +1110,10 @@ export default function Game() {
         </div>
 
         {/* Sets counter + End Turn */}
-        <div className="flex flex-col items-center gap-2 flex-none">
+        <div className="flex flex-row md:flex-col items-center gap-2 flex-none">
           <div className="text-center">
-            <p className="text-3xl font-bold text-foreground">{countCompleteSets(myBoard)}</p>
-            <p className="text-[10px] text-muted-foreground">/ 3 Sets</p>
+            <p className="text-xl md:text-3xl font-bold text-foreground">{countCompleteSets(myBoard)}</p>
+            <p className="text-[9px] md:text-[10px] text-muted-foreground">/ 3 Sets</p>
           </div>
           {isMyTurn && gameState.phase === 'playing' && (
             <div className="flex flex-col items-center gap-1">
