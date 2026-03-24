@@ -173,7 +173,8 @@
 
 .animate-card-play { animation: card-play 0.5s ease-out forwards; }
 .animate-card-draw { animation: card-draw 0.4s ease-out; }
-.animate-fly-to-hand { animation: flyToHand 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+.animate-fly-to-hand { animation: flyToHand 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; }
+.animate-card-deal-bounce { animation: cardDealBounce 0.5s ease-out; }
 .animate-coin-collect { animation: coin-collect 0.6s ease-out; }
 .animate-set-complete { animation: set-complete 1s ease-out; }
 .animate-shield-block { animation: shield-block 0.4s ease-out; }
