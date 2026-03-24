@@ -720,17 +720,23 @@ export default function Game() {
         </div>
       </div>
 
-      {/* Opponents area - compact */}
+      {/* Opponents area - clickable to expand */}
       <div className="flex-none flex gap-2 px-3 py-2 overflow-x-auto border-b bg-muted/30">
         {players.filter(p => p.user_id !== userId).map(player => {
           const board: PlayerBoard = gameState.boards[player.user_id] || createEmptyBoard();
           const handCount = gameState.handCounts[player.user_id] || 0;
           const isCurrentTurn = getCurrentPlayerId(gameState) === player.user_id;
+          const isExpanded = expandedOpponent === player.user_id;
+          const completeColors = getCompleteSetColors(board);
+          const inProgressColors = (Object.keys(board.properties) as PropertyColor[]).filter(
+            c => board.properties[c].length > 0 && !completeColors.includes(c)
+          );
 
           return (
             <div
               key={player.user_id}
-              className={`flex-none rounded-lg border p-2 min-w-[200px] max-w-[260px] ${isCurrentTurn ? 'border-primary bg-primary/5' : 'border-border bg-card'}`}
+              className={`flex-none rounded-lg border p-2 cursor-pointer transition-all ${isExpanded ? 'min-w-[320px] max-w-[400px]' : 'min-w-[200px] max-w-[260px]'} ${isCurrentTurn ? 'border-primary bg-primary/5' : 'border-border bg-card'}`}
+              onClick={() => setExpandedOpponent(isExpanded ? null : player.user_id)}
             >
               <div className="flex items-center justify-between mb-1">
                 <span className="font-semibold text-xs text-foreground truncate">{player.display_name}</span>
@@ -741,29 +747,93 @@ export default function Game() {
                   <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
                     <DollarSign className="w-3 h-3" /> {getBankTotal(board)}M
                   </span>
+                  {isExpanded ? <ChevronDown className="w-3 h-3 text-muted-foreground" /> : <ChevronRight className="w-3 h-3 text-muted-foreground" />}
                 </div>
               </div>
 
-              {/* Opponent's properties - compact */}
-              <div className="flex flex-wrap gap-0.5 mb-1">
-                {(Object.keys(board.properties) as PropertyColor[]).map(color => {
-                  const props = board.properties[color];
-                  if (!props || props.length === 0) return null;
-                  const setSize = PROPERTY_SETS[color].size;
-                  const isComplete = props.length >= setSize;
-                  const config = COLOR_CONFIG[color];
-                  return (
-                    <div key={color} className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${config.bg} ${config.text} ${isComplete ? 'ring-1 ring-yellow-400' : ''}`}>
-                      {config.label} ({props.length}/{setSize}) {isComplete && '✓'}
+              {/* Compact view */}
+              {!isExpanded && (
+                <>
+                  <div className="flex flex-wrap gap-0.5 mb-1">
+                    {completeColors.map(color => {
+                      const config = COLOR_CONFIG[color];
+                      return (
+                        <div key={color} className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${config.bg} ${config.text} ring-2 ring-yellow-400 shadow-sm`}>
+                          ✨ {config.label} ({board.properties[color].length}/{PROPERTY_SETS[color].size})
+                        </div>
+                      );
+                    })}
+                    {inProgressColors.map(color => {
+                      const config = COLOR_CONFIG[color];
+                      return (
+                        <div key={color} className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${config.bg} ${config.text}`}>
+                          {config.label} ({board.properties[color].length}/{PROPERTY_SETS[color].size})
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {board.bank.length > 0 && (
+                    <div className="text-[9px] text-muted-foreground font-semibold">
+                      💰 Bank: {getBankTotal(board)}M ({board.bank.length} cards)
                     </div>
-                  );
-                })}
-              </div>
+                  )}
+                </>
+              )}
 
-              {/* Opponent bank - stacked */}
-              {board.bank.length > 0 && (
-                <div className="text-[9px] text-muted-foreground font-semibold">
-                  💰 Bank: {getBankTotal(board)}M ({board.bank.length} cards)
+              {/* Expanded view - full details */}
+              {isExpanded && (
+                <div className="mt-2 space-y-2" onClick={e => e.stopPropagation()}>
+                  {/* Complete sets */}
+                  {completeColors.length > 0 && (
+                    <div>
+                      <p className="text-[9px] font-bold text-yellow-600 uppercase mb-1">✨ Complete Sets</p>
+                      <div className="flex flex-wrap gap-1">
+                        {completeColors.map(color => (
+                          <div key={color} className="rounded-lg p-1 border-2 border-yellow-400 bg-yellow-50/80 shadow-md">
+                            <div className="flex gap-0.5">
+                              {board.properties[color].map(card => (
+                                <div key={card.uid} onClick={() => setPreviewCard(card)} className="cursor-pointer">
+                                  <GameCardComponent card={card} small />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {/* In-progress sets */}
+                  {inProgressColors.length > 0 && (
+                    <div>
+                      <p className="text-[9px] font-bold text-muted-foreground uppercase mb-1">In Progress</p>
+                      <div className="flex flex-wrap gap-1">
+                        {inProgressColors.map(color => (
+                          <div key={color} className="rounded-lg p-1 border border-border">
+                            <div className="flex gap-0.5">
+                              {board.properties[color].map(card => (
+                                <div key={card.uid} onClick={() => setPreviewCard(card)} className="cursor-pointer">
+                                  <GameCardComponent card={card} small />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {/* Bank cards */}
+                  {board.bank.length > 0 && (
+                    <div>
+                      <p className="text-[9px] font-bold text-muted-foreground uppercase mb-1">💰 Bank ({getBankTotal(board)}M)</p>
+                      <div className="flex gap-0.5 flex-wrap">
+                        {board.bank.map(card => (
+                          <div key={card.uid} onClick={() => setPreviewCard(card)} className="cursor-pointer">
+                            <GameCardComponent card={card} small />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
