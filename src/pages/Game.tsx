@@ -453,6 +453,20 @@ export default function Game() {
     setDoubleRentCardUid(null);
     await persistState(result.state, result.hand);
     toast.success(`${card.name} played!${doubleRentPending ? ' (DOUBLED!)' : ''}`);
+    // Trigger celebrations
+    const celebrationMap: Record<string, { msg: string; emoji: string }> = {
+      'Rent': { msg: `Collecting Rent!`, emoji: '💰' },
+      'Wild Rent': { msg: `Collecting Rent!`, emoji: '💰' },
+      'Sly Deal': { msg: 'Property Stolen!', emoji: '🕵️' },
+      'Deal Breaker': { msg: 'Complete Set Stolen!', emoji: '💥' },
+      'Forced Deal': { msg: 'Properties Swapped!', emoji: '🔄' },
+      "It's Your Birthday": { msg: 'Happy Birthday! Collecting M2!', emoji: '🎂' },
+      'Debt Collector': { msg: 'Collecting M5 Debt!', emoji: '🏦' },
+      'House': { msg: 'House Added! +M3 Rent', emoji: '🏠' },
+      'Hotel': { msg: 'Hotel Added! +M4 Rent', emoji: '🏨' },
+    };
+    const cele = celebrationMap[card.name];
+    if (cele) triggerCelebration(card.name, cele.msg, cele.emoji);
   }, [gameState, selectedCard, myHand, selectedTarget, selectedColor, selectedTargetCard, selectedSourceCard, doubleRentPending, persistState]);
 
   // Handle paying for an action (as a target)
