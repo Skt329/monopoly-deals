@@ -19,6 +19,7 @@ interface TargetSelectorProps {
   onConfirm: () => void;
   onCancel: () => void;
   availableColors?: PropertyColor[];
+  currentPlayerBoard?: PlayerBoard;
 }
 
 export function TargetSelector({
