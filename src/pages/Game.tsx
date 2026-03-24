@@ -1305,14 +1305,13 @@ export default function Game() {
               <Badge variant="destructive" className="text-[8px] md:text-[9px] animate-pulse">Select a Rent card!</Badge>
             )}
           </div>
-          <div className="flex gap-1 md:gap-1.5 overflow-x-auto pb-1 snap-x snap-mandatory md:snap-none justify-start md:justify-center">
+          <div className="flex gap-2 md:gap-3 overflow-x-auto pb-2 snap-x snap-mandatory md:snap-none justify-start md:justify-center">
             {myHand.map((card, i) => (
               <div key={card.uid} className="flex-none snap-center" style={{ animationDelay: `${i * 50}ms` }}>
                 <GameCardComponent
                   card={card}
                   onClick={() => handleCardClick(card.uid)}
                   selected={selectedCard === card.uid}
-                  small
                 />
               </div>
             ))}
@@ -1320,28 +1319,32 @@ export default function Game() {
         </div>
       )}
 
-      {/* Mobile floating chat */}
-      <GameChat
-        roomId={roomId}
-        userId={userId}
-        playerName={getPlayerName(userId)}
-        players={players}
-        variant="floating"
-        isOpen={chatOpen}
-        onToggle={() => setChatOpen(prev => !prev)}
-      />
+      {/* Mobile floating chat - only on small screens */}
+      <div className="md:hidden">
+        <GameChat
+          roomId={roomId}
+          userId={userId}
+          playerName={getPlayerName(userId)}
+          players={players}
+          variant="floating"
+          isOpen={chatOpen}
+          onToggle={() => setChatOpen(prev => !prev)}
+        />
+      </div>
     </div>
-    {/* Desktop chat sidebar */}
+    {/* Desktop chat sidebar - only on md+ */}
     {chatOpen && (
-      <GameChat
-        roomId={roomId}
-        userId={userId}
-        playerName={getPlayerName(userId)}
-        players={players}
-        variant="topbar"
-        isOpen={chatOpen}
-        onToggle={() => setChatOpen(prev => !prev)}
-      />
+      <div className="hidden md:flex">
+        <GameChat
+          roomId={roomId}
+          userId={userId}
+          playerName={getPlayerName(userId)}
+          players={players}
+          variant="topbar"
+          isOpen={chatOpen}
+          onToggle={() => setChatOpen(prev => !prev)}
+        />
+      </div>
     )}
     </div>
   );
