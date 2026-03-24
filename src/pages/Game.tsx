@@ -197,6 +197,22 @@ export default function Game() {
     toast.success(`Drew ${result.drawnCards.length} cards`);
   }, [gameState, isMyTurn, myHand, persistState]);
 
+  // Check if turn should auto-end or discard after a play
+  const checkAutoEndTurn = useCallback(async (newState: PublicGameState, newHand: GameCard[]) => {
+    if (newState.cardsPlayedThisTurn >= 3 && !newState.winner) {
+      if (newHand.length > MAX_HAND_SIZE) {
+        setDiscardMode(true);
+        setDiscardSelected([]);
+        toast.info(`You've used all 3 plays. Discard down to ${MAX_HAND_SIZE} cards.`);
+      } else {
+        const endedState = endTurn(newState);
+        setGameState(endedState);
+        await supabase.from('game_states').update({ current_state: endedState as unknown as import('@/integrations/supabase/types').Json }).eq('room_id', roomId);
+        toast.info('All 3 plays used — turn ended automatically');
+      }
+    }
+  }, [roomId]);
+
   const handlePlayAsProperty = useCallback(async (color: PropertyColor) => {
     if (!gameState || !selectedCard) return;
     const result = playCardAsProperty(gameState, myHand, selectedCard, color);
@@ -209,8 +225,9 @@ export default function Game() {
       toast.success('🎉 You completed 3 sets! YOU WIN!', { duration: 10000 });
     } else {
       toast.success('Property played!');
+      await checkAutoEndTurn(result.state, result.hand);
     }
-  }, [gameState, selectedCard, myHand, persistState]);
+  }, [gameState, selectedCard, myHand, persistState, checkAutoEndTurn]);
 
   const handlePlayAsMoney = useCallback(async () => {
     if (!gameState || !selectedCard) return;
@@ -219,7 +236,8 @@ export default function Game() {
     setSelectedCard(null);
     await persistState(result.state, result.hand);
     toast.success('Added to bank!');
-  }, [gameState, selectedCard, myHand, persistState]);
+    await checkAutoEndTurn(result.state, result.hand);
+  }, [gameState, selectedCard, myHand, persistState, checkAutoEndTurn]);
 
   // Action card play - opens target selector if needed
   const handlePlayAction = useCallback(() => {
