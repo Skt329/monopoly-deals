@@ -774,6 +774,25 @@ export default function Game() {
           </div>
         </div>
       )}
+
+      {/* Center-screen notifications */}
+      {gameNotifications.length > 0 && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[55] flex flex-col gap-2 pointer-events-none">
+          {gameNotifications.map(notif => (
+            <div key={notif.id} className="animate-in slide-in-from-top-4 fade-in duration-300 bg-card/95 backdrop-blur-md border-2 border-primary/50 rounded-xl shadow-2xl px-4 py-3 flex items-center gap-3 min-w-[280px] max-w-[400px]">
+              {notif.card && (
+                <div className="flex-none">
+                  <GameCardComponent card={notif.card} small />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-black text-primary truncate">{notif.playerName}</p>
+                <p className="text-[11px] text-foreground font-medium">{notif.action}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       {/* Action Response Panel */}
       {gameState.phase === 'responding' && gameState.pendingAction && (
         <ActionResponsePanel
