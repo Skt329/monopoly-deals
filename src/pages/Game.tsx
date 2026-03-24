@@ -25,6 +25,7 @@ import {
   createEmptyBoard,
   payWithCards,
 } from '@/lib/gameEngine';
+import { discardCards, MAX_HAND_SIZE } from '@/lib/gameEngine';
 import { GameCardComponent } from '@/components/game/cards/GameCardComponent';
 import { CardBack } from '@/components/game/cards/CardBack';
 import { ActionResponsePanel } from '@/components/game/ActionResponsePanel';

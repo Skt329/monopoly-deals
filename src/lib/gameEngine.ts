@@ -438,12 +438,30 @@ export function discardCards(
   const discarded = hand.filter(c => cardUids.includes(c.uid));
   const newHand = hand.filter(c => !cardUids.includes(c.uid));
 
+  if (newHand.length <= MAX_HAND_SIZE) {
+    // Done discarding — end the turn and move to next player
+    const nextIndex = (state.currentPlayerIndex + 1) % state.playerOrder.length;
+    return {
+      state: {
+        ...state,
+        discardPile: [...state.discardPile, ...discarded],
+        handCounts: { ...state.handCounts, [playerId]: newHand.length },
+        currentPlayerIndex: nextIndex,
+        cardsPlayedThisTurn: 0,
+        phase: 'drawing',
+        pendingAction: null,
+      },
+      hand: newHand,
+    };
+  }
+
+  // Still need to discard more
   return {
     state: {
       ...state,
       discardPile: [...state.discardPile, ...discarded],
       handCounts: { ...state.handCounts, [playerId]: newHand.length },
-      phase: newHand.length <= MAX_HAND_SIZE ? 'drawing' : 'discard',
+      phase: 'discard',
     },
     hand: newHand,
   };
