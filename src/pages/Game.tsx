@@ -81,6 +81,8 @@ export default function Game() {
   const [rearrangeCard, setRearrangeCard] = useState<GameCard | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const forceEndRef = useRef(false);
+  const [expandedOpponent, setExpandedOpponent] = useState<string | null>(null);
+  const [celebration, setCelebration] = useState<{ type: string; message: string; emoji: string } | null>(null);
 
   // Initialize
   useEffect(() => {
