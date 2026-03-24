@@ -114,8 +114,76 @@ export function initializeGame(playerIds: string[]): {
       pendingAction: null,
       winner: null,
       handCounts,
+      gameLog: [],
     },
     hands,
+  };
+}
+
+// ═══════════════════════════════════════════
+// GAME LOG
+// ═══════════════════════════════════════════
+
+export function addLogEntry(
+  state: PublicGameState,
+  playerId: string,
+  playerName: string,
+  action: string,
+  detail: string
+): PublicGameState {
+  const entry: LogEntry = { playerId, playerName, action, detail, timestamp: Date.now() };
+  return { ...state, gameLog: [...(state.gameLog || []), entry] };
+}
+
+// ═══════════════════════════════════════════
+// PLAYER REMOVAL (exit mid-game)
+// ═══════════════════════════════════════════
+
+export function removePlayer(
+  state: PublicGameState,
+  playerId: string,
+  playerHand: GameCard[]
+): PublicGameState {
+  const board = state.boards[playerId] || createEmptyBoard();
+  // Collect all cards from player's board + hand
+  const returnedCards: GameCard[] = [...playerHand];
+  for (const color of Object.keys(board.properties) as PropertyColor[]) {
+    returnedCards.push(...board.properties[color]);
+  }
+  returnedCards.push(...board.bank);
+
+  // Shuffle returned cards back into deck
+  const newDeck = shuffleDeck([...state.deck, ...returnedCards]);
+
+  // Remove player from order
+  const newPlayerOrder = state.playerOrder.filter(id => id !== playerId);
+  const newBoards = { ...state.boards };
+  delete newBoards[playerId];
+  const newHandCounts = { ...state.handCounts };
+  delete newHandCounts[playerId];
+
+  // Adjust currentPlayerIndex
+  let newIndex = state.currentPlayerIndex;
+  const removedIndex = state.playerOrder.indexOf(playerId);
+  if (removedIndex <= state.currentPlayerIndex && newIndex > 0) {
+    newIndex--;
+  }
+  if (newPlayerOrder.length > 0) {
+    newIndex = newIndex % newPlayerOrder.length;
+  }
+
+  // If only 1 player left, they win
+  const winner = newPlayerOrder.length === 1 ? newPlayerOrder[0] : state.winner;
+
+  return {
+    ...state,
+    deck: newDeck,
+    boards: newBoards,
+    playerOrder: newPlayerOrder,
+    handCounts: newHandCounts,
+    currentPlayerIndex: newIndex,
+    winner,
+    phase: winner ? 'finished' : state.phase,
   };
 }
 
