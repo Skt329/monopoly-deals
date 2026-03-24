@@ -373,7 +373,14 @@ export function playActionCard(
       const setSize = PROPERTY_SETS[targetColor].size;
       if (board.properties[targetColor].length < setSize) return null;
 
-      const newBoard = { ...board, hasHouse: { ...board.hasHouse, [targetColor]: true } };
+      const newBoard = {
+        ...board,
+        hasHouse: { ...board.hasHouse, [targetColor]: true },
+        properties: {
+          ...board.properties,
+          [targetColor]: [...board.properties[targetColor], { ...card, chosenColor: targetColor }],
+        },
+      };
       newState = { ...newState, boards: { ...newState.boards, [playerId]: newBoard } };
       return { state: newState, hand: newHand };
     }
@@ -383,7 +390,14 @@ export function playActionCard(
       const board = state.boards[playerId];
       if (!board.hasHouse[targetColor]) return null;
 
-      const newBoard = { ...board, hasHotel: { ...board.hasHotel, [targetColor]: true } };
+      const newBoard = {
+        ...board,
+        hasHotel: { ...board.hasHotel, [targetColor]: true },
+        properties: {
+          ...board.properties,
+          [targetColor]: [...board.properties[targetColor], { ...card, chosenColor: targetColor }],
+        },
+      };
       newState = { ...newState, boards: { ...newState.boards, [playerId]: newBoard } };
       return { state: newState, hand: newHand };
     }
