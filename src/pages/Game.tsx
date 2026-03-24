@@ -456,6 +456,16 @@ export default function Game() {
 
   const handleEndTurn = useCallback(async () => {
     if (!gameState || !isMyTurn) return;
+    // If hand > 7 but player still has plays left, warn them
+    if (needsDiscard(myHand) && gameState.cardsPlayedThisTurn < 3) {
+      toast.warning(`You still have ${3 - gameState.cardsPlayedThisTurn} play(s) left! Use them to reduce your hand, or click End Turn again to discard.`, { id: 'end-turn-warn' });
+      // Set a flag so second click forces discard
+      if (!forceEndRef.current) {
+        forceEndRef.current = true;
+        return;
+      }
+    }
+    forceEndRef.current = false;
     if (needsDiscard(myHand)) {
       setDiscardMode(true);
       setDiscardSelected([]);
