@@ -883,6 +883,15 @@ export default function Game() {
           </AlertDialog>
         </div>
         <div className="flex items-center gap-1 md:gap-2 text-sm flex-shrink-0">
+          <GameChat
+            roomId={roomId}
+            userId={userId}
+            playerName={getPlayerName(userId)}
+            players={players}
+            variant="topbar"
+            isOpen={chatOpen}
+            onToggle={() => setChatOpen(prev => !prev)}
+          />
           <Badge variant={isMyTurn ? 'default' : 'secondary'} className={`text-[9px] md:text-xs ${isMyTurn ? 'animate-pulse' : ''}`}>
             {isMyTurn ? "⭐ Your Turn" : `${currentPlayerName}'s Turn`}
           </Badge>
