@@ -1307,6 +1307,14 @@ export default function Game() {
           </div>
         </div>
       )}
+
+      {/* Game Chat */}
+      <GameChat
+        roomId={roomId}
+        userId={userId}
+        playerName={getPlayerName(userId)}
+        players={players}
+      />
     </div>
   );
 }
