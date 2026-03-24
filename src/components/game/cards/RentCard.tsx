@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { type GameCard, COLOR_CONFIG } from '@/data/cards';
+import { type GameCard, COLOR_CONFIG, type PropertyColor } from '@/data/cards';
 
 interface RentCardProps {
   card: GameCard;
@@ -7,6 +7,12 @@ interface RentCardProps {
   selected?: boolean;
   small?: boolean;
 }
+
+const COLOR_HEX: Record<PropertyColor, string> = {
+  'brown': '#8B4513', 'light-blue': '#87CEEB', 'magenta': '#C71585',
+  'orange': '#FF8C00', 'red': '#DC143C', 'yellow': '#FFD700',
+  'green': '#228B22', 'dark-blue': '#00008B', 'railroad': '#2F2F2F', 'utility': '#32CD32',
+};
 
 export function RentCard({ card, onClick, selected, small }: RentCardProps) {
   const colors = card.colors || [];
@@ -16,56 +22,63 @@ export function RentCard({ card, onClick, selected, small }: RentCardProps) {
     <div
       onClick={onClick}
       className={cn(
-        'relative rounded-xl border-2 border-border bg-card shadow-md cursor-pointer transition-all duration-200 select-none overflow-hidden flex flex-col',
-        small ? 'w-20 h-28' : 'w-32 h-44',
-        selected && 'ring-2 ring-primary scale-105 -translate-y-1',
+        'relative rounded-xl border-2 shadow-lg cursor-pointer transition-all duration-200 select-none overflow-hidden flex flex-col bg-white',
+        small ? 'w-20 h-28' : 'w-36 h-52',
+        selected && 'ring-2 ring-primary scale-105 -translate-y-2',
         onClick && 'hover:scale-105 hover:-translate-y-1'
       )}
+      style={{ borderColor: isWild ? '#FFD700' : COLOR_HEX[colors[0]] }}
     >
-      {/* Header */}
+      {/* Value + ACTION label */}
       <div className={cn(
-        'text-white font-bold',
-        isWild
-          ? 'bg-gradient-to-r from-red-500 via-yellow-400 to-blue-500'
-          : 'flex',
-        small ? 'py-1' : 'py-1.5'
-      )}>
-        {isWild ? (
-          <p className={cn('text-center', small ? 'text-[7px] px-1' : 'text-[10px] px-2')}>RENT</p>
-        ) : (
-          colors.map((color) => {
-            const config = COLOR_CONFIG[color];
-            return (
-              <div key={color} className={cn(config.bg, config.text, 'flex-1 text-center', small ? 'py-0' : 'py-0')}>
-                <p className={cn(small ? 'text-[6px]' : 'text-[9px]')}>RENT</p>
-              </div>
-            );
-          })
-        )}
+        'absolute z-10 rounded-full font-black flex items-center justify-center border-2 border-white shadow-sm text-white',
+        small ? 'top-0.5 left-0.5 w-5 h-5 text-[7px]' : 'top-1 left-1 w-7 h-7 text-[10px]'
+      )} style={{ backgroundColor: isWild ? '#FFD700' : COLOR_HEX[colors[0]] }}>
+        M{card.value}
       </div>
+
+      <div className={cn(
+        'absolute z-10 font-black text-white rounded-bl-lg',
+        small ? 'top-0 right-0 px-1 py-0.5 text-[5px]' : 'top-0 right-0 px-2 py-1 text-[8px]'
+      )} style={{ backgroundColor: isWild ? '#FFD700' : COLOR_HEX[colors[0]] }}>
+        ACTION
+      </div>
+
+      {/* Color band header */}
+      {isWild ? (
+        <div className={cn('text-center text-white font-black', small ? 'py-2 pt-4 text-[6px]' : 'py-3 pt-6 text-sm')}
+          style={{ background: 'linear-gradient(135deg, #DC143C, #FF8C00, #FFD700, #228B22, #00008B)' }}>
+          RENT
+        </div>
+      ) : (
+        <div className="flex">
+          {colors.map(color => (
+            <div key={color} className={cn('flex-1 text-center text-white font-black', small ? 'py-2 pt-4 text-[6px]' : 'py-3 pt-6 text-sm')}
+              style={{ backgroundColor: COLOR_HEX[color] }}>
+              RENT
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Body */}
       <div className={cn('flex-1 flex flex-col items-center justify-center', small ? 'p-1' : 'p-2')}>
         {!small && (
           <>
-            <div className="flex gap-1.5 mb-1">
-              {colors.slice(0, 4).map(color => (
-                <span key={color} className={cn('rounded-full', COLOR_CONFIG[color].bg, 'w-4 h-4')} />
+            <p className="text-[8px] font-bold uppercase text-muted-foreground mb-1">
+              {isWild ? 'Choose any color' : `Choose ${colors.map(c => COLOR_CONFIG[c].label).join(' or ')}`}
+            </p>
+            <div className="flex gap-1.5 mt-1">
+              {colors.slice(0, isWild ? 5 : 2).map(color => (
+                <span key={color} className="rounded-full w-5 h-5 border border-white shadow-sm"
+                  style={{ backgroundColor: COLOR_HEX[color] }} />
               ))}
             </div>
-            <p className="text-[8px] text-muted-foreground text-center font-medium">
-              {isWild ? 'Charge any color' : `Charge ${colors.map(c => COLOR_CONFIG[c].label).join(' or ')} rent`}
+            <p className="text-[7px] text-muted-foreground text-center mt-2 leading-tight">
+              Collect rent from each player for each property you own in that color.
             </p>
           </>
         )}
-      </div>
-
-      {/* Value */}
-      <div className={cn(
-        'absolute rounded-full font-bold flex items-center justify-center bg-muted text-foreground',
-        small ? 'top-0.5 right-0.5 w-4 h-4 text-[7px]' : 'top-1 right-1 w-5 h-5 text-[9px]'
-      )}>
-        {card.value}M
       </div>
     </div>
   );

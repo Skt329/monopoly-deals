@@ -8,6 +8,19 @@ interface PropertyCardProps {
   small?: boolean;
 }
 
+const COLOR_HEX: Record<PropertyColor, string> = {
+  'brown': '#8B4513',
+  'light-blue': '#87CEEB',
+  'magenta': '#C71585',
+  'orange': '#FF8C00',
+  'red': '#DC143C',
+  'yellow': '#FFD700',
+  'green': '#228B22',
+  'dark-blue': '#00008B',
+  'railroad': '#2F2F2F',
+  'utility': '#32CD32',
+};
+
 export function PropertyCard({ card, onClick, selected, small }: PropertyCardProps) {
   const color = card.chosenColor || card.color!;
   const config = COLOR_CONFIG[color];
@@ -18,50 +31,65 @@ export function PropertyCard({ card, onClick, selected, small }: PropertyCardPro
     <div
       onClick={onClick}
       className={cn(
-        'relative rounded-xl border-2 border-border bg-card shadow-md cursor-pointer transition-all duration-200 select-none overflow-hidden',
-        small ? 'w-20 h-28' : 'w-32 h-44',
-        selected && 'ring-2 ring-primary scale-105 -translate-y-1',
+        'relative rounded-xl border-2 shadow-lg cursor-pointer transition-all duration-200 select-none overflow-hidden flex flex-col',
+        'bg-white',
+        small ? 'w-20 h-28' : 'w-36 h-52',
+        selected && 'ring-2 ring-primary scale-105 -translate-y-2',
         onClick && 'hover:scale-105 hover:-translate-y-1'
       )}
+      style={{ borderColor: COLOR_HEX[color] }}
     >
-      {/* Color header */}
-      <div className={cn(config.bg, config.text, small ? 'px-1.5 py-1' : 'px-2.5 py-2')}>
-        <p className={cn('font-bold leading-tight', small ? 'text-[7px]' : 'text-[10px]')}>
-          {card.name}
-        </p>
-      </div>
-
-      {/* Rent table */}
-      <div className={cn('flex flex-col items-center justify-center flex-1', small ? 'px-1 py-0.5' : 'px-2 py-1.5')}>
-        {!small && (
-          <div className="w-full space-y-0.5">
-            {Object.entries(rentTable).map(([count, rent]) => (
-              <div key={count} className="flex items-center justify-between text-[8px] text-muted-foreground">
-                <span className="flex gap-0.5">
-                  {Array.from({ length: Number(count) }).map((_, i) => (
-                    <span key={i} className={cn('w-2 h-2.5 rounded-[2px] inline-block', config.bg)} />
-                  ))}
-                </span>
-                <span className="font-semibold text-foreground">{rent}M</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Value badge */}
+      {/* Value circle - top left */}
       <div className={cn(
-        'absolute rounded-full font-bold flex items-center justify-center bg-muted text-foreground',
-        small ? 'top-0.5 right-0.5 w-4 h-4 text-[7px]' : 'top-1 right-1 w-5 h-5 text-[9px]'
+        'absolute z-10 rounded-full font-black flex items-center justify-center border-2 border-white shadow-sm',
+        config.bg, config.text,
+        small ? 'top-0.5 left-0.5 w-5 h-5 text-[7px]' : 'top-1 left-1 w-7 h-7 text-[10px]'
       )}>
         {card.value}M
       </div>
 
-      {/* Set size indicator */}
-      <div className={cn('absolute bottom-0.5 left-0 right-0 flex justify-center gap-0.5')}>
-        {Array.from({ length: setSize }).map((_, i) => (
-          <span key={i} className={cn('rounded-full border', small ? 'w-1.5 h-1.5' : 'w-2 h-2', config.bg, 'opacity-40')} />
-        ))}
+      {/* Color band with property name */}
+      <div className={cn(config.bg, config.text, 'text-center', small ? 'px-1 py-2 pt-3' : 'px-2 py-3 pt-5')}>
+        <p className={cn('font-black uppercase tracking-wide leading-tight', small ? 'text-[6px]' : 'text-[11px]')}>
+          {card.name}
+        </p>
+      </div>
+
+      {/* Rent table section */}
+      <div className={cn('flex-1 flex flex-col', small ? 'px-1 py-0.5' : 'px-3 py-1.5')}>
+        {!small && (
+          <>
+            <div className="flex justify-between text-[7px] font-bold text-muted-foreground uppercase tracking-wider border-b border-border pb-0.5 mb-1">
+              <span>Rent</span>
+              <span>Owned</span>
+            </div>
+            <div className="space-y-0.5 flex-1">
+              {Object.entries(rentTable).map(([count, rent]) => (
+                <div key={count} className="flex items-center justify-between text-[9px]">
+                  <span className="font-bold text-foreground">M{rent}</span>
+                  <span className="flex gap-0.5">
+                    {Array.from({ length: Number(count) }).map((_, i) => (
+                      <span key={i} className={cn('w-2.5 h-3 rounded-[2px] inline-block border', config.bg)} 
+                        style={{ borderColor: COLOR_HEX[color] }} />
+                    ))}
+                  </span>
+                </div>
+              ))}
+            </div>
+            {/* Complete set indicator */}
+            <div className="text-center border-t border-border pt-1 mt-1">
+              <span className="text-[7px] font-bold uppercase text-muted-foreground tracking-wider">
+                Complete Set
+              </span>
+              <div className="flex justify-center gap-0.5 mt-0.5">
+                {Array.from({ length: setSize }).map((_, i) => (
+                  <span key={i} className={cn('rounded-sm border', config.bg, 'w-3 h-3.5')}
+                    style={{ borderColor: COLOR_HEX[color], opacity: 0.5 }} />
+                ))}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
