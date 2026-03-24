@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -116,19 +116,19 @@ export default function Lobby() {
       gameState.roomId = room.id;
 
       // Save game state
-      const { error: stateError } = await supabase.from('game_states').insert({
+      const { error: stateError } = await supabase.from('game_states').insert([{
         room_id: room.id,
-        current_state: gameState,
-      });
+        current_state: gameState as unknown as import('@/integrations/supabase/types').Json,
+      }]);
       if (stateError) throw stateError;
 
       // Save each player's hand
       for (const [playerId, hand] of Object.entries(hands)) {
-        const { error: handError } = await supabase.from('player_hands').insert({
+        const { error: handError } = await supabase.from('player_hands').insert([{
           room_id: room.id,
           user_id: playerId,
-          hand,
-        });
+          hand: hand as unknown as import('@/integrations/supabase/types').Json,
+        }]);
         if (handError) throw handError;
       }
 

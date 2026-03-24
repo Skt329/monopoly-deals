@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
@@ -73,7 +73,7 @@ export default function Game() {
         .select('current_state')
         .eq('room_id', room.id)
         .single();
-      if (stateData) setGameState(stateData.current_state as PublicGameState);
+      if (stateData) setGameState(stateData.current_state as unknown as PublicGameState);
 
       // Load hand
       const { data: handData } = await supabase
@@ -82,7 +82,7 @@ export default function Game() {
         .eq('room_id', room.id)
         .eq('user_id', user.id)
         .single();
-      if (handData) setMyHand(handData.hand as GameCard[]);
+      if (handData) setMyHand(handData.hand as unknown as GameCard[]);
     };
     init();
   }, [roomCode, navigate]);
@@ -116,7 +116,7 @@ export default function Game() {
           .eq('room_id', roomId)
           .eq('user_id', userId)
           .single();
-        if (data) setMyHand(data.hand as GameCard[]);
+        if (data) setMyHand(data.hand as unknown as GameCard[]);
       })
       .subscribe();
 
@@ -133,8 +133,8 @@ export default function Game() {
     setGameState(newState);
     setMyHand(newHand);
     await Promise.all([
-      supabase.from('game_states').update({ current_state: newState }).eq('room_id', roomId),
-      supabase.from('player_hands').update({ hand: newHand }).eq('room_id', roomId).eq('user_id', userId),
+      supabase.from('game_states').update({ current_state: newState as unknown as import('@/integrations/supabase/types').Json }).eq('room_id', roomId),
+      supabase.from('player_hands').update({ hand: newHand as unknown as import('@/integrations/supabase/types').Json }).eq('room_id', roomId).eq('user_id', userId),
     ]);
   }, [roomId, userId]);
 
