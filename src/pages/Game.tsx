@@ -596,9 +596,18 @@ export default function Game() {
             <p className="text-xs text-muted-foreground">/ 3 Sets</p>
           </div>
           {isMyTurn && gameState.phase === 'playing' && (
-            <Button onClick={handleEndTurn} variant="secondary" className="gap-1 text-sm">
-              End Turn <ChevronRight className="w-3 h-3" />
-            </Button>
+            <div className="flex flex-col items-center gap-1">
+              <Button
+                onClick={handleEndTurn}
+                variant={gameState.cardsPlayedThisTurn >= 3 ? 'default' : 'secondary'}
+                className={`gap-1 text-sm ${gameState.cardsPlayedThisTurn >= 3 ? 'animate-pulse' : ''}`}
+              >
+                End Turn <ChevronRight className="w-3 h-3" />
+              </Button>
+              {gameState.cardsPlayedThisTurn >= 3 && (
+                <span className="text-[10px] text-destructive font-semibold">No more plays!</span>
+              )}
+            </div>
           )}
         </div>
       </div>
