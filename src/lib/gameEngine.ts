@@ -666,3 +666,48 @@ export function getCompleteSetColors(board: PlayerBoard): PropertyColor[] {
     color => isSetComplete(board, color)
   );
 }
+
+/** Rearrange a wild property card from its current color to a new valid color (free action) */
+export function rearrangeWildProperty(
+  state: PublicGameState,
+  playerId: string,
+  cardUid: string,
+  newColor: PropertyColor
+): PublicGameState | null {
+  const board = state.boards[playerId];
+  if (!board) return null;
+
+  // Find and remove from current color
+  const removed = removePropertyCard(board, cardUid);
+  if (!removed.card || !removed.color) return null;
+
+  // Validate card is wild and new color is valid
+  const card = removed.card;
+  if (card.type !== 'wild_property') return null;
+  if (card.colors && !card.colors.includes(newColor)) return null;
+  if (removed.color === newColor) return null;
+
+  // Add to new color with updated chosenColor
+  const updatedCard = { ...card, chosenColor: newColor };
+  const newBoard = addPropertyCard(removed.board, updatedCard, newColor);
+
+  return {
+    ...state,
+    boards: { ...state.boards, [playerId]: newBoard },
+  };
+}
+
+/** Check if a player has any properties on their board */
+export function hasAnyProperties(board: PlayerBoard): boolean {
+  return (Object.keys(board.properties) as PropertyColor[]).some(
+    color => board.properties[color].length > 0
+  );
+}
+
+/** Check if any opponent has stealable properties */
+export function anyOpponentHasStealable(boards: Record<string, PlayerBoard>, currentPlayerId: string): boolean {
+  return Object.keys(boards).some(pid => {
+    if (pid === currentPlayerId) return false;
+    return getStealableProperties(boards[pid]).length > 0;
+  });
+}
