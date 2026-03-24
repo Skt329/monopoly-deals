@@ -1087,7 +1087,7 @@ export default function Game() {
         </div>
 
         {/* Deck & Discard - center */}
-        <div className="flex flex-col items-center gap-2 flex-none" ref={deckRef}>
+        <div className="flex flex-row md:flex-col items-center gap-2 flex-none" ref={deckRef}>
           <div className="text-center">
             <CardBack count={gameState.deck.length} />
             <p className="text-[9px] text-muted-foreground mt-0.5">Draw ({gameState.deck.length})</p>
