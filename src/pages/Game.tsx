@@ -214,6 +214,7 @@ export default function Game() {
     const result = drawCards(gameState, myHand);
     await persistState(result.state, result.hand);
     toast.success(`Drew ${result.drawnCards.length} cards`);
+    triggerCelebration('pass_go', `Drew ${result.drawnCards.length} Cards!`, '🎉');
   }, [gameState, isMyTurn, myHand, persistState]);
 
   // Check if turn should auto-end or discard after a play
