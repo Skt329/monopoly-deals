@@ -732,12 +732,21 @@ export default function Game() {
         <div className="flex-none px-4 py-2 border-t bg-card flex items-center justify-center gap-3 shadow-lg">
           <span className="text-sm text-muted-foreground font-medium">{selectedCardData.name}</span>
 
-          {(selectedCardData.type === 'property') && (
+          {/* Money cards: only Play to Bank */}
+          {selectedCardData.type === 'money' && (
+            <Button size="sm" onClick={handlePlayAsMoney}>
+              Play to Bank (M{selectedCardData.value})
+            </Button>
+          )}
+
+          {/* Property cards: only Play as Property */}
+          {selectedCardData.type === 'property' && (
             <Button size="sm" onClick={() => handlePlayAsProperty(selectedCardData.color!)}>
               Play as Property
             </Button>
           )}
 
+          {/* Wild Property: Play as Property (with color picker) OR Play as Money */}
           {selectedCardData.type === 'wild_property' && (
             <>
               <Button size="sm" variant="outline" onClick={() => setShowColorPicker(!showColorPicker)}>
@@ -755,13 +764,34 @@ export default function Game() {
                   ))}
                 </div>
               )}
+              <Button size="sm" variant="secondary" onClick={handlePlayAsMoney}>
+                Play as Money (M{selectedCardData.value})
+              </Button>
             </>
           )}
 
-          {(selectedCardData.type === 'action' || selectedCardData.type === 'rent') && !doubleRentPending && (
-            <Button size="sm" onClick={handlePlayAction}>
-              Play Action
-            </Button>
+          {/* Action cards: Play Action OR Play as Money */}
+          {selectedCardData.type === 'action' && !doubleRentPending && (
+            <>
+              <Button size="sm" onClick={handlePlayAction}>
+                Play Action
+              </Button>
+              <Button size="sm" variant="secondary" onClick={handlePlayAsMoney}>
+                Play as Money (M{selectedCardData.value})
+              </Button>
+            </>
+          )}
+
+          {/* Rent cards: Play Action OR Play as Money (or Double Rent combo) */}
+          {selectedCardData.type === 'rent' && !doubleRentPending && (
+            <>
+              <Button size="sm" onClick={handlePlayAction}>
+                Play Rent
+              </Button>
+              <Button size="sm" variant="secondary" onClick={handlePlayAsMoney}>
+                Play as Money (M{selectedCardData.value})
+              </Button>
+            </>
           )}
 
           {/* When Double Rent is active and user picks a rent card */}
@@ -770,10 +800,6 @@ export default function Game() {
               🔥 Play with Double Rent!
             </Button>
           )}
-
-          <Button size="sm" variant="secondary" onClick={handlePlayAsMoney}>
-            Play as Money (M{selectedCardData.value})
-          </Button>
         </div>
       )}
 
