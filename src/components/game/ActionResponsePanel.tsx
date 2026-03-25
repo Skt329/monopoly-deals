@@ -12,8 +12,8 @@ interface ActionResponsePanelProps {
   myBoard: PlayerBoard;
   players: { user_id: string; display_name: string }[];
   onPay: (bankCardUids: string[], propertyCards: { uid: string; color: PropertyColor }[]) => void;
-  onJustSayNo: () => void;
-  onAccept: () => void;
+  onJustSayNo: (targetIdForSource?: string) => void;
+  onAccept: (targetIdForSource?: string) => void;
 }
 
 export function ActionResponsePanel({
@@ -25,11 +25,50 @@ export function ActionResponsePanel({
   const pending = gameState.pendingAction;
   if (!pending) return null;
 
+  const counts = pending.justSayNoCounts || {};
+  const myJsnCount = counts[userId] || 0;
+
   const isTarget = pending.targetPlayerIds.includes(userId) && !pending.respondedPlayers.includes(userId);
-  if (!isTarget) return null;
+  const targetNeedsToRespond = isTarget && myJsnCount % 2 === 0;
+
+  const sourceChallenges = pending.targetPlayerIds.filter(tid => !pending.respondedPlayers.includes(tid) && (counts[tid] || 0) % 2 === 1);
+  const amSourceWithChallenge = userId === pending.sourcePlayerId && sourceChallenges.length > 0;
+
+  if (!targetNeedsToRespond && !amSourceWithChallenge) return null;
+
+  const hasJustSayNo = myHand.some(c => c.name === 'Just Say No');
+
+  if (amSourceWithChallenge) {
+    const challengingTargetId = sourceChallenges[0];
+    const challengingTargetName = players.find(p => p.user_id === challengingTargetId)?.display_name || 'Target';
+    
+    return (
+      <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+        <div className="bg-card rounded-2xl border-2 border-primary shadow-2xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
+          <h2 className="text-lg font-black text-foreground mb-1">
+            🛡️ {challengingTargetName} played Just Say No!
+          </h2>
+          <p className="text-sm text-muted-foreground mb-4">
+             They are trying to block your action. Play another Just Say No to counter them, or accept their block.
+          </p>
+          <div className="flex gap-3 mt-6">
+            <Button onClick={() => onAccept(challengingTargetId)} variant="destructive" className="flex-1 gap-2">
+              <X className="w-4 h-4" />
+              Accept (Cancel Action)
+            </Button>
+            {hasJustSayNo && (
+              <Button onClick={() => onJustSayNo(challengingTargetId)} variant="outline" className="flex-1 gap-2 border-green-500 text-green-600 hover:bg-green-50">
+                <Shield className="w-4 h-4" />
+                Play Just Say No!
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const sourceName = players.find(p => p.user_id === pending.sourcePlayerId)?.display_name || 'Unknown';
-  const hasJustSayNo = myHand.some(c => c.name === 'Just Say No');
 
   const totalSelected = selectedBankCards.reduce((sum, uid) => {
     const card = myBoard.bank.find(c => c.uid === uid);
@@ -105,7 +144,7 @@ export function ActionResponsePanel({
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
       <div className="bg-card rounded-2xl border-2 border-primary shadow-2xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
         <h2 className="text-lg font-black text-foreground mb-1">
-          ⚡ Action Against You!
+          {myJsnCount > 0 ? "⚔️ Your Just Say No was Countered!" : "⚡ Action Against You!"}
         </h2>
         <p className="text-sm text-muted-foreground mb-2">
           {pending.type === 'rent' && (
@@ -250,14 +289,14 @@ export function ActionResponsePanel({
           )}
 
           {isStealAction && (
-            <Button onClick={onAccept} variant="destructive" className="flex-1 gap-2">
+            <Button onClick={() => onAccept()} variant="destructive" className="flex-1 gap-2">
               <X className="w-4 h-4" />
               Accept
             </Button>
           )}
 
           {hasJustSayNo && (
-            <Button onClick={onJustSayNo} variant="outline" className="flex-1 gap-2 border-green-500 text-green-600 hover:bg-green-50">
+            <Button onClick={() => onJustSayNo()} variant="outline" className="flex-1 gap-2 border-green-500 text-green-600 hover:bg-green-50">
               <Shield className="w-4 h-4" />
               Just Say No!
             </Button>

@@ -56,6 +56,7 @@ export interface PendingAction {
   targetColor?: PropertyColor;
   targetCardUid?: string;
   sourceCardUid?: string;
+  justSayNoCounts?: Record<string, number>;
 }
 
 // ═══════════════════════════════════════════

@@ -601,7 +601,7 @@ export default function Game() {
   }, [gameState, userId, myHand, persistState]);
 
   // Handle Just Say No
-  const handleJustSayNo = useCallback(async () => {
+  const handleJustSayNo = useCallback(async (targetIdForSource?: string) => {
     if (!gameState || !gameState.pendingAction) return;
     const pending = gameState.pendingAction;
 
@@ -610,25 +610,50 @@ export default function Game() {
     const newHand = myHand.filter((_, i) => i !== jsnIndex);
     const jsnCard = myHand[jsnIndex];
 
-    const newResponded = [...pending.respondedPlayers, userId];
-    const allResponded = pending.targetPlayerIds.every(id => newResponded.includes(id));
+    const counts = { ...(pending.justSayNoCounts || {}) };
+    
+    // Determine the relevant target ID for this JSN interaction.
+    let relevantTargetId = userId;
+    if (userId === pending.sourcePlayerId) {
+      if (!targetIdForSource) return;
+      relevantTargetId = targetIdForSource;
+    }
+
+    const currentCount = counts[relevantTargetId] || 0;
+    counts[relevantTargetId] = currentCount + 1;
 
     const newState: PublicGameState = {
       ...gameState,
       discardPile: [...gameState.discardPile, jsnCard],
-      pendingAction: allResponded ? null : { ...pending, respondedPlayers: newResponded },
-      phase: allResponded ? 'playing' : 'responding',
+      pendingAction: { ...pending, justSayNoCounts: counts },
       handCounts: { ...gameState.handCounts, [userId]: newHand.length },
     };
 
     await persistState(newState, newHand);
-    toast.success('Just Say No! Action blocked! 🛡️');
+    const actionWord = currentCount === 0 ? 'blocked' : 'countered';
+    toast.success(`Just Say No! Action ${actionWord}! 🛡️`);
   }, [gameState, userId, myHand, persistState]);
 
-  // Handle accepting steal actions
-  const handleAccept = useCallback(async () => {
+  // Handle accepting steal actions or giving up on a Just Say No chain
+  const handleAccept = useCallback(async (targetIdForSource?: string) => {
     if (!gameState || !gameState.pendingAction) return;
     const pending = gameState.pendingAction;
+
+    if (userId === pending.sourcePlayerId) {
+      if (!targetIdForSource) return;
+      // Source accepts target's Just Say No
+      const newResponded = [...pending.respondedPlayers, targetIdForSource];
+      const allResponded = pending.targetPlayerIds.every(id => newResponded.includes(id));
+      
+      const newState: PublicGameState = {
+        ...gameState,
+        pendingAction: allResponded ? null : { ...pending, respondedPlayers: newResponded },
+        phase: allResponded ? 'playing' : 'responding',
+      };
+      await persistState(newState, myHand);
+      toast.info(`You let ${getPlayerName(targetIdForSource)} off the hook.`);
+      return;
+    }
 
     let stateAfterResolve = gameState;
 
@@ -661,7 +686,7 @@ export default function Game() {
 
     await persistState(newState, myHand);
     toast.info('Action accepted — properties transferred');
-  }, [gameState, userId, myHand, persistState]);
+  }, [gameState, userId, myHand, persistState, getPlayerName]);
 
   // Exit game handler
   const handleExitGame = useCallback(async () => {
@@ -1119,8 +1144,8 @@ export default function Game() {
         {/* Deck & Discard - center */}
         <div className="flex flex-row md:flex-col items-center gap-2 flex-none" ref={deckRef}>
           <div className="text-center">
-            <CardBack count={gameState.deck.length} />
-            <p className="text-[9px] text-muted-foreground mt-0.5">Draw ({gameState.deck.length})</p>
+            <CardBack count={gameState.deck.length} className="w-20 h-28 md:w-32 md:h-44" />
+            <p className="text-[9px] md:text-[11px] text-muted-foreground mt-0.5">Draw ({gameState.deck.length})</p>
           </div>
           {isMyTurn && gameState.phase === 'drawing' && (
             <Button onClick={handleDraw} size="sm" className="gap-1 text-xs animate-pulse">
@@ -1128,14 +1153,16 @@ export default function Game() {
             </Button>
           )}
           <div className="text-center">
-            <div className="w-16 h-24 rounded-lg border-2 border-dashed border-border flex items-center justify-center bg-muted/20">
+            <div className="w-20 h-28 md:w-32 md:h-44 rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center bg-muted/20 overflow-hidden relative shadow-sm">
               {gameState.discardPile.length > 0 ? (
-                <GameCardComponent card={gameState.discardPile[gameState.discardPile.length - 1]} small />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 scale-[0.55] md:scale-[0.85] w-[144px] h-[208px]">
+                   <GameCardComponent card={gameState.discardPile[gameState.discardPile.length - 1]} />
+                </div>
               ) : (
-                <Layers className="w-5 h-5 text-muted-foreground/30" />
+                <Layers className="w-5 h-5 md:w-8 md:h-8 text-muted-foreground/30" />
               )}
             </div>
-            <p className="text-[9px] text-muted-foreground mt-0.5">Discard</p>
+            <p className="text-[9px] md:text-[11px] text-muted-foreground mt-0.5">Discard</p>
           </div>
         </div>
 

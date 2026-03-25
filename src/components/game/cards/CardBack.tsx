@@ -12,8 +12,8 @@ export function CardBack({ count, small, className }: CardBackProps) {
       <div
         className={cn(
           'rounded-xl border-2 border-red-800 shadow-lg select-none overflow-hidden flex flex-col items-center justify-center',
-          'bg-gradient-to-br from-red-600 via-red-700 to-red-900',
-          small ? 'w-14 h-20' : 'w-20 h-28'
+          'bg-gradient-to-br from-red-600 via-red-700 to-red-900 w-full h-full min-w-[3.5rem] min-h-[5rem]',
+          !className?.includes('w-') && (small ? 'w-14 h-20' : 'w-20 h-28 md:w-32 md:h-44')
         )}
       >
         <div className="absolute inset-1 border-2 border-white/20 rounded-lg" />
