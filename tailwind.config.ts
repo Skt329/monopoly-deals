@@ -73,25 +73,29 @@ export default {
       },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
         },
+        "float": {
+          "0%, 100%": { transform: "translateY(0) rotate(var(--tw-rotate, 0deg)) scale(var(--tw-scale-x, 1), var(--tw-scale-y, 1))" },
+          "50%": { transform: "translateY(-12px) rotate(var(--tw-rotate, 0deg)) scale(var(--tw-scale-x, 1), var(--tw-scale-y, 1))" },
+        },
+        "pulse-glow": {
+          "0%, 100%": { filter: "drop-shadow(0 0 15px rgba(var(--primary), 0.5))" },
+          "50%": { filter: "drop-shadow(0 0 30px rgba(var(--primary), 0.8))" },
+        }
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "float": "float 14s ease-in-out infinite",
+        "float-delayed": "float 18s ease-in-out 7s infinite",
+        "float-long": "float 24s ease-in-out 3s infinite",
+        "pulse-glow": "pulse-glow 4s ease-in-out infinite",
       },
     },
   },
