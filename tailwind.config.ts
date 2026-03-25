@@ -88,10 +88,9 @@ export default {
           "0%, 100%": { filter: "drop-shadow(0 0 15px rgba(var(--primary), 0.5))" },
           "50%": { filter: "drop-shadow(0 0 30px rgba(var(--primary), 0.8))" },
         },
-        "bounce-sequence": {
-          "0%, 20%, 100%": { transform: "translateY(0)" },
-          "10%": { transform: "translateY(-25px)" },
-          "15%": { transform: "translateY(5px)" }
+        "float-bouncy": {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-15px)" }
         }
       },
       animation: {
@@ -101,9 +100,9 @@ export default {
         "float-delayed": "float 18s ease-in-out 7s infinite",
         "float-long": "float 24s ease-in-out 3s infinite",
         "pulse-glow": "pulse-glow 4s ease-in-out infinite",
-        "bounce-card-1": "bounce-sequence 6s cubic-bezier(0.28, 0.84, 0.42, 1) infinite",
-        "bounce-card-2": "bounce-sequence 6s cubic-bezier(0.28, 0.84, 0.42, 1) 0.3s infinite",
-        "bounce-card-3": "bounce-sequence 6s cubic-bezier(0.28, 0.84, 0.42, 1) 0.6s infinite",
+        "bounce-card-1": "float-bouncy 3s ease-in-out infinite",
+        "bounce-card-2": "float-bouncy 3s ease-in-out 1s infinite",
+        "bounce-card-3": "float-bouncy 3s ease-in-out 2s infinite",
       },
     },
   },

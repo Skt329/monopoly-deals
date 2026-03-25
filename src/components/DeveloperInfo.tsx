@@ -3,7 +3,7 @@ import { Github, Linkedin, Globe, Mail, Code2, Heart } from 'lucide-react';
 export function DeveloperInfo() {
   return (
     <div className="fixed bottom-4 right-4 z-50 group">
-      <div className="absolute bottom-full right-0 pb-3 w-72 opacity-0 scale-95 translate-y-4 pointer-events-none group-hover:pointer-events-auto group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0 transition-all duration-400 ease-out origin-bottom-right">
+      <div className="absolute bottom-full right-0 sm:right-0 pb-3 w-[calc(100vw-2rem)] sm:w-72 max-w-xs sm:max-w-none opacity-0 scale-95 translate-y-4 pointer-events-none group-hover:pointer-events-auto group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0 transition-all duration-400 ease-out origin-bottom-right">
         <div className="p-5 rounded-2xl bg-[#0a1f18]/80 backdrop-blur-xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] ring-1 ring-white/5">
           <div className="mb-4">
             <h4 className="font-display font-bold text-lg text-white tracking-tight">Saurabh Tiwari</h4>

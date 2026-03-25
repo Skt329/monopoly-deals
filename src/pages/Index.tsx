@@ -140,7 +140,7 @@ export default function Index() {
   };
 
   return (
-    <div className="min-h-screen relative flex flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-[#022c22] via-[#064e3b] to-[#022c22] px-4 py-12">
+    <div className="min-[100dvh] relative flex flex-col items-center justify-center overflow-x-hidden overflow-y-auto bg-gradient-to-br from-[#022c22] via-[#064e3b] to-[#022c22] px-4 py-12 pb-28">
       {/* Pattern Overlay */}
       <div className="absolute inset-0 z-0 bg-monopoly-pattern opacity-[0.03] mix-blend-overlay pointer-events-none" />
       
