@@ -149,36 +149,48 @@ export default function Index() {
       <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-teal-500/10 rounded-full blur-[100px] pointer-events-none mix-blend-screen" />
 
       {/* Main Content Area */}
-      <div className="relative z-10 w-full max-w-lg mx-auto flex flex-col items-center">
+      <div className="relative z-10 w-full max-w-lg mx-auto flex flex-col items-center justify-center min-h-[100dvh]">
         
         {/* Title */}
-        <div className="mb-12 text-center drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)] animate-in fade-in slide-in-from-top-4 duration-700">
-          <h1 className="text-5xl md:text-[4rem] font-display font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-300 tracking-tighter">
+        <div className="mb-8 md:mb-12 text-center drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)] animate-in fade-in slide-in-from-top-4 duration-700">
+          <h1 className="text-5xl sm:text-[3.5rem] md:text-[4rem] font-display font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-300 tracking-tighter leading-none">
             MONOPOLY
-            <span className="block text-transparent bg-clip-text bg-gradient-to-b from-[#4ade80] to-[#16a34a] mt-[-8px] filter drop-shadow-[0_0_15px_rgba(34,197,94,0.4)]">DEAL</span>
+            <span className="block text-4xl sm:text-5xl md:text-[4rem] text-transparent bg-clip-text bg-gradient-to-b from-[#4ade80] to-[#16a34a] mt-[-4px] md:mt-[-8px] filter drop-shadow-[0_0_15px_rgba(34,197,94,0.4)]">DEAL</span>
           </h1>
         </div>
 
-        {/* Decorative Fan of Cards with Outer Glow */}
-        <div className="relative flex justify-center items-end -space-x-12 mb-10 animate-in zoom-in duration-700 delay-150 fill-mode-both">
+        {/* Decorative Fan of Cards with Outer Glow - Scaled down for mobile */}
+        <div className="relative flex justify-center items-end -space-x-12 sm:-space-x-8 md:-space-x-12 mb-6 md:mb-10 transform scale-[0.65] sm:scale-75 md:scale-100 origin-bottom animate-in zoom-in duration-700 delay-150 fill-mode-both">
           {/* Outer Halo Glow */}
-          <div className="absolute inset-0 bg-emerald-500/20 rounded-full blur-[60px] transform scale-150 z-0" />
+          <div className="absolute inset-0 bg-emerald-500/20 rounded-full blur-[40px] md:blur-[60px] transform scale-150 z-0" />
           
           {/* Floating Accents */}
-          <div className="absolute -left-12 top-4 w-4 h-4 rounded-full bg-emerald-400/40 blur-[2px] animate-float" />
-          <div className="absolute -right-8 top-12 w-6 h-6 rounded-full bg-teal-400/30 blur-[3px] animate-float-delayed" />
-          <div className="absolute left-1/2 -top-8 w-3 h-3 rounded-full bg-white/40 blur-[1px] animate-float-long" />
+          <div className="absolute -left-12 top-4 w-4 h-4 rounded-full bg-emerald-400/40 blur-[2px] animate-float hidden md:block" />
+          <div className="absolute -right-8 top-12 w-6 h-6 rounded-full bg-teal-400/30 blur-[3px] animate-float-delayed hidden md:block" />
+          <div className="absolute left-1/2 -top-8 w-3 h-3 rounded-full bg-white/40 blur-[1px] animate-float-long hidden md:block" />
 
           {centerCards.map((centerCard, index) => {
             const CardComponent = centerCard.component;
             let transformClass = "";
-            if (index === 0) transformClass = "transform -rotate-12 translate-y-6 translate-x-4 shadow-[0_15px_30px_rgba(0,0,0,0.6)] transition-all hover:-translate-y-2 hover:-rotate-[14deg] hover:scale-105 duration-300 relative z-10";
-            if (index === 1) transformClass = "transform relative z-20 shadow-[0_25px_50px_rgba(0,0,0,0.8)] transition-all hover:-translate-y-6 hover:scale-110 duration-300 scale-105 ring-1 ring-white/10 rounded-xl";
-            if (index === 2) transformClass = "transform rotate-12 translate-y-6 -translate-x-4 shadow-[0_15px_30px_rgba(0,0,0,0.6)] transition-all hover:-translate-y-2 hover:rotate-[14deg] hover:scale-105 duration-300 relative z-10";
+            let bounceClass = "";
+            if (index === 0) {
+              transformClass = "transform -rotate-12 translate-y-6 translate-x-4 shadow-[0_15px_30px_rgba(0,0,0,0.6)] transition-all hover:-translate-y-2 hover:-rotate-[14deg] hover:scale-105 duration-300 relative z-10";
+              bounceClass = "animate-bounce-card-1";
+            }
+            if (index === 1) {
+              transformClass = "transform relative z-20 shadow-[0_25px_50px_rgba(0,0,0,0.8)] transition-all hover:-translate-y-6 hover:scale-110 duration-300 scale-105 ring-1 ring-white/10 rounded-xl";
+              bounceClass = "animate-bounce-card-2";
+            }
+            if (index === 2) {
+              transformClass = "transform rotate-12 translate-y-6 -translate-x-4 shadow-[0_15px_30px_rgba(0,0,0,0.6)] transition-all hover:-translate-y-2 hover:rotate-[14deg] hover:scale-105 duration-300 relative z-10";
+              bounceClass = "animate-bounce-card-3";
+            }
 
             return (
               <div key={centerCard.data.uid} className={transformClass}>
-                <CardComponent card={centerCard.data as any} />
+                <div className={bounceClass}>
+                  <CardComponent card={centerCard.data as any} />
+                </div>
               </div>
             );
           })}
