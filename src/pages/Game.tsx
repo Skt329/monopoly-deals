@@ -590,6 +590,12 @@ export default function Game() {
       phase: allResponded ? 'playing' : 'responding',
     };
 
+    const collectorBoard = newState.boards[pending.sourcePlayerId];
+    if (collectorBoard && countCompleteSets(collectorBoard) >= 3) {
+      newState.winner = pending.sourcePlayerId;
+      newState.phase = 'finished';
+    }
+
     await persistState(newState, myHand);
     toast.success('Payment sent!');
   }, [gameState, userId, myHand, persistState]);
@@ -643,6 +649,13 @@ export default function Game() {
     const attackerBoard = newState.boards[pending.sourcePlayerId];
     if (attackerBoard && countCompleteSets(attackerBoard) >= 3) {
       newState.winner = pending.sourcePlayerId;
+      newState.phase = 'finished';
+    }
+    
+    // Check win condition for the target after forced deal
+    const targetBoard = newState.boards[userId];
+    if (!newState.winner && targetBoard && countCompleteSets(targetBoard) >= 3) {
+      newState.winner = userId;
       newState.phase = 'finished';
     }
 
@@ -710,6 +723,13 @@ export default function Game() {
     if (!gameState) return;
     const result = rearrangeWildProperty(gameState, userId, cardUid, newColor);
     if (!result) { toast.error('Cannot rearrange this card'); return; }
+
+    const myBoard = result.boards[userId];
+    if (myBoard && countCompleteSets(myBoard) >= 3) {
+      result.winner = userId;
+      result.phase = 'finished';
+    }
+
     setRearrangeCardUid(null);
     setRearrangeCard(null);
     setGameState(result);
